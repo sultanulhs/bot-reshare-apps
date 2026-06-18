@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { MobileModule } from './mobile/mobile.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { OrderModule } from './order/order.module';
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OrderModule } from './order/order.module';
     MobileModule,
     TelegramModule,
     OrderModule,
+    WebhookModule,
   ],
   controllers: [AppController],
   providers: [AppService],
