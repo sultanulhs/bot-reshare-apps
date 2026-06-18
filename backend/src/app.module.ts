@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queue/queue.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
+import { MobileModule } from './mobile/mobile.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
     QueueModule,
     CryptoModule,
     AuthModule,
+    MobileModule,
   ],
   controllers: [AppController],
   providers: [AppService],
