@@ -1,7 +1,5 @@
 import {
-  Body,
   Controller,
-  Headers,
   HttpCode,
   Logger,
   Post,
@@ -22,24 +20,46 @@ export class WebhookController {
   async handleWebhook(@Req() req: RawBodyRequest<Request>) {
     const rawBody = req.rawBody;
     if (!rawBody) {
-      this.logger.error('No raw body available');
-      return { responseCode: '5000000', responseMessage: 'General Error' };
+      this.logger.error('Missing raw body in webhook request');
+      return {
+        responseCode: '5000000',
+        responseMessage: 'General Error',
+      };
     }
 
-    const body = JSON.parse(rawBody.toString('utf-8'));
+    let body: any;
+    try {
+      body = JSON.parse(rawBody.toString('utf-8'));
+    } catch {
+      this.logger.error('Invalid JSON in webhook body');
+      return {
+        responseCode: '5000000',
+        responseMessage: 'Invalid Request Format',
+      };
+    }
 
-    // TODO: In production, verify DANA signature against rawBody
-    // For sandbox, skip signature verification
-    this.logger.log(
-      `Webhook received: partnerReferenceNo=${body.originalPartnerReferenceNo}`,
-    );
+    if (!body.originalPartnerReferenceNo) {
+      this.logger.error('Missing originalPartnerReferenceNo in webhook');
+      return {
+        responseCode: '4000000',
+        responseMessage: 'Bad Request',
+      };
+    }
 
     try {
       await this.fulfilmentService.handlePaymentNotification(body);
-      return { responseCode: '2000000', responseMessage: 'Success' };
+      return {
+        responseCode: '2000000',
+        responseMessage: 'Success',
+      };
     } catch (err: any) {
-      this.logger.error(`Webhook processing error: ${err.message}`);
-      return { responseCode: '5000000', responseMessage: 'General Error' };
+      this.logger.error(
+        `Webhook error for ${body.originalPartnerReferenceNo}: ${err.message}`,
+      );
+      return {
+        responseCode: '5000000',
+        responseMessage: 'General Error',
+      };
     }
   }
 }
