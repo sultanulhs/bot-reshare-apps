@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SELLER
+  ADMIN
+}
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  PROFILE_SUBMITTED
+  ACTIVE
+  SUSPENDED
+}
+
+enum StockStatus {
+  AVAILABLE
+  LOCKED
+  SOLD
+}
+
+enum StockType {
+  PRE_STOCKED
+  ON_DEMAND
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  WAITING_SELLER
+  EXPIRED
+  FAILED
+  FULFILLED
+}
+
+enum LedgerType {
+  SELLER_CREDIT
+  OPERATOR_MARKUP
+  SUBSCRIPTION_FEE
+}
+
+enum SubStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum MarkupMode {
+  FIXED
+  RANDOM
+}
+
+enum ReportStatus {
+  OPEN
+  RESPONDED
+  RESOLVED
+  ESCALATED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(SELLER)
+  seller       Seller?
+  createdAt    DateTime @default(now())
+}
+
+model Seller {
+  id            String          @id @default(cuid())
+  userId        String          @unique
+  user          User            @relation(fields: [userId], references: [id])
+  name          String
+  phone         String
+  storeCode     String?         @unique
+  status        SellerStatus    @default(PENDING)
+  products      Product[]
+  ledgerEntries LedgerEntry[]
+  profile       SellerProfile?
+  subscriptions Subscription[]
+  reports       Report[]
+  createdAt     DateTime        @default(now())
+}
+
+model SellerProfile {
+  id         String    @id @default(cuid())
+  sellerId   String    @unique
+  seller     Seller    @relation(fields: [sellerId], references: [id])
+  encPayout  String
+  payoutIv   String
+  payoutTag  String
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Product {
+  id         String      @id @default(cuid())
+  sellerId   String
+  seller     Seller      @relation(fields: [sellerId], references: [id])
+  category   String
+  title      String
+  basePrice  Int
+  stockType  StockType   @default(PRE_STOCKED)
+  active     Boolean     @default(true)
+  stockUnits StockUnit[]
+  createdAt  DateTime    @default(now())
+}
+
+model StockUnit {
+  id             String      @id @default(cuid())
+  productId      String
+  product        Product     @relation(fields: [productId], references: [id])
+  encCredentials String
+  iv             String
+  authTag        String
+  status         StockStatus @default(AVAILABLE)
+  order          Order?
+  createdAt      DateTime    @default(now())
+}
+
+model Order {
+  id                    String      @id @default(cuid())
+  buyerTgUserId         BigInt
+  stockUnitId           String?     @unique
+  stockUnit             StockUnit?  @relation(fields: [stockUnitId], references: [id])
+  productId             String
+  basePrice             Int
+  markup                Int
+  totalAmount           Int
+  partnerReferenceNo    String      @unique
+  danaReferenceNo       String?
+  status                OrderStatus @default(PENDING)
+  qrContent             String?
+  expiresAt             DateTime
+  createdAt             DateTime    @default(now())
+  fulfilledAt           DateTime?
+}
+
+model LedgerEntry {
+  id        String     @id @default(cuid())
+  sellerId  String?
+  seller    Seller?    @relation(fields: [sellerId], references: [id])
+  orderId   String
+  type      LedgerType
+  amount    Int
+  createdAt DateTime   @default(now())
+}
+
+model BotConfig {
+  id          String   @id @default("singleton")
+  welcomeText String   @default("")
+  categories  String   @default("[]")
+  featuresOn  String   @default("{}")
+  updatedAt   DateTime @updatedAt
+}
+
+model MarkupConfig {
+  id         String     @id @default("singleton")
+  mode       MarkupMode @default(FIXED)
+  fixedValue Int        @default(0)
+  randomMin  Int        @default(0)
+  randomMax  Int        @default(0)
+  updatedAt  DateTime   @updatedAt
+}
+
+model SubscriptionPlan {
+  id            String         @id @default(cuid())
+  name          String
+  price         Int
+  periodDays    Int
+  active        Boolean        @default(true)
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+}
+
+model Subscription {
+  id                    String   @id @default(cuid())
+  sellerId              String
+  seller                Seller   @relation(fields: [sellerId], references: [id])
+  planId                String
+  plan                  SubscriptionPlan @relation(fields: [planId], references: [id])
+  status                SubStatus @default(PENDING)
+  partnerReferenceNo    String    @unique
+  startedAt             DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime  @default(now())
+}
+
+model BuyerAffiliation {
+  id            String   @id @default(cuid())
+  buyerTgUserId BigInt   @unique
+  sellerId      String
+  updatedAt     DateTime @updatedAt
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  orderId       String
+  buyerTgUserId BigInt
+  sellerId      String
+  seller        Seller       @relation(fields: [sellerId], references: [id])
+  message       String
+  status        ReportStatus @default(OPEN)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
