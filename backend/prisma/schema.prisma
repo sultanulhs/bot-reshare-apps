@@ -87,6 +87,7 @@ model Seller {
   profile       SellerProfile?
   subscriptions Subscription[]
   reports       Report[]
+  affiliations  BuyerAffiliation[]
   createdAt     DateTime        @default(now())
 }
 
@@ -111,6 +112,7 @@ model Product {
   stockType  StockType   @default(PRE_STOCKED)
   active     Boolean     @default(true)
   stockUnits StockUnit[]
+  orders     Order[]
   createdAt  DateTime    @default(now())
 }
 
@@ -132,6 +134,7 @@ model Order {
   stockUnitId           String?     @unique
   stockUnit             StockUnit?  @relation(fields: [stockUnitId], references: [id])
   productId             String
+  product               Product     @relation(fields: [productId], references: [id])
   basePrice             Int
   markup                Int
   totalAmount           Int
@@ -142,6 +145,8 @@ model Order {
   expiresAt             DateTime
   createdAt             DateTime    @default(now())
   fulfilledAt           DateTime?
+  ledgerEntries         LedgerEntry[]
+  reports               Report[]
 }
 
 model LedgerEntry {
@@ -149,6 +154,7 @@ model LedgerEntry {
   sellerId  String?
   seller    Seller?    @relation(fields: [sellerId], references: [id])
   orderId   String
+  order     Order      @relation(fields: [orderId], references: [id])
   type      LedgerType
   amount    Int
   createdAt DateTime   @default(now())
@@ -198,12 +204,14 @@ model BuyerAffiliation {
   id            String   @id @default(cuid())
   buyerTgUserId BigInt   @unique
   sellerId      String
+  seller        Seller   @relation(fields: [sellerId], references: [id])
   updatedAt     DateTime @updatedAt
 }
 
 model Report {
   id            String       @id @default(cuid())
   orderId       String
+  order         Order        @relation(fields: [orderId], references: [id])
   buyerTgUserId BigInt
   sellerId      String
   seller        Seller       @relation(fields: [sellerId], references: [id])
