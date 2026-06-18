@@ -3,12 +3,14 @@ import { FulfilmentService } from './fulfilment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 describe('FulfilmentService', () => {
   let service: FulfilmentService;
   let prisma: any;
   let crypto: any;
   let telegram: any;
+  let subscriptionService: any;
 
   beforeEach(async () => {
     prisma = {
@@ -38,12 +40,17 @@ describe('FulfilmentService', () => {
       },
     };
 
+    subscriptionService = {
+      activateSubscription: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FulfilmentService,
         { provide: PrismaService, useValue: prisma },
         { provide: CryptoService, useValue: crypto },
         { provide: TelegramService, useValue: telegram },
+        { provide: SubscriptionService, useValue: subscriptionService },
       ],
     }).compile();
 
@@ -133,6 +140,17 @@ describe('FulfilmentService', () => {
       });
 
       expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should route SUB_ prefixed payments to subscription activation', async () => {
+      await service.handlePaymentNotification({
+        originalPartnerReferenceNo: 'SUB_1234567890_abc123',
+      });
+
+      expect(subscriptionService.activateSubscription).toHaveBeenCalledWith(
+        'SUB_1234567890_abc123',
+      );
+      expect(prisma.order.findUnique).not.toHaveBeenCalled();
     });
   });
 });

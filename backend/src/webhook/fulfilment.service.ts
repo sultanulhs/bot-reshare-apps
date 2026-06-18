@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class FulfilmentService {
@@ -11,6 +12,7 @@ export class FulfilmentService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly telegram: TelegramService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   async handlePaymentNotification(body: {
@@ -18,6 +20,11 @@ export class FulfilmentService {
     [key: string]: any;
   }) {
     const refNo = body.originalPartnerReferenceNo;
+
+    if (refNo.startsWith('SUB_')) {
+      await this.subscriptionService.activateSubscription(refNo);
+      return;
+    }
 
     const order = await this.prisma.order.findUnique({
       where: { partnerReferenceNo: refNo },
