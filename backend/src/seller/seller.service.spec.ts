@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SellerService } from './seller.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { ConfigService } from '@nestjs/config';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('SellerService', () => {
   let service: SellerService;
   let prisma: any;
   let crypto: any;
+  let config: any;
 
   beforeEach(async () => {
     prisma = {
@@ -29,11 +31,16 @@ describe('SellerService', () => {
       }),
     };
 
+    config = {
+      get: jest.fn().mockReturnValue('test_bot'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SellerService,
         { provide: PrismaService, useValue: prisma },
         { provide: CryptoService, useValue: crypto },
+        { provide: ConfigService, useValue: config },
       ],
     }).compile();
 

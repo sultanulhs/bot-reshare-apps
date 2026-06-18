@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { SubmitProfileDto } from './dto/submit-profile.dto';
@@ -12,6 +13,7 @@ export class SellerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    private readonly config: ConfigService,
   ) {}
 
   async getStatus(userId: string) {
@@ -64,5 +66,23 @@ export class SellerService {
 
       return { status: updated.status };
     });
+  }
+
+  async getStoreLink(userId: string) {
+    const seller = await this.prisma.seller.findUnique({
+      where: { userId },
+    });
+    if (!seller) {
+      throw new NotFoundException('Seller not found');
+    }
+    if (!seller.storeCode) {
+      throw new BadRequestException('Store code not yet assigned');
+    }
+
+    const botUsername = this.config.get<string>('TELEGRAM_BOT_USERNAME');
+    return {
+      storeCode: seller.storeCode,
+      url: `https://t.me/${botUsername}?start=${seller.storeCode}`,
+    };
   }
 }

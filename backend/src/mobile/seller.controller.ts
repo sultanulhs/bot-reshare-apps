@@ -44,6 +44,11 @@ export class SellerController {
     return this.sellerService.getStatus(req.user.sub);
   }
 
+  @Get('store-link')
+  getStoreLink(@Req() req: any) {
+    return this.sellerService.getStoreLink(req.user.sub);
+  }
+
   @Post('profile')
   submitProfile(@Req() req: any, @Body() dto: SubmitProfileDto) {
     return this.sellerService.submitProfile(req.user.sub, dto);
