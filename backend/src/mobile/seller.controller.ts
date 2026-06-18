@@ -17,6 +17,7 @@ import { ActiveSellerGuard } from '../seller/guards/active-seller.guard';
 import { SellerService } from '../seller/seller.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { StockService } from '../stock/stock.service';
+import { LedgerService } from '../ledger/ledger.service';
 import { SubmitProfileDto } from '../seller/dto/submit-profile.dto';
 import { CreateProductDto } from '../catalog/dto/create-product.dto';
 import { UpdateProductDto } from '../catalog/dto/update-product.dto';
@@ -30,6 +31,7 @@ export class SellerController {
     private readonly sellerService: SellerService,
     private readonly catalogService: CatalogService,
     private readonly stockService: StockService,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   @Get('me')
@@ -83,5 +85,17 @@ export class SellerController {
   ) {
     const seller = await this.sellerService.getStatus(req.user.sub);
     return this.stockService.listStock(seller.id, { productId, status });
+  }
+
+  @Get('balance')
+  async getBalance(@Req() req: any) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    return this.ledgerService.getBalance(seller.id);
+  }
+
+  @Get('sales')
+  async getSales(@Req() req: any) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    return this.ledgerService.getSales(seller.id);
   }
 }
