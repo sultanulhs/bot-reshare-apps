@@ -24,6 +24,8 @@ import { UpdateProductDto } from '../catalog/dto/update-product.dto';
 import { AddStockDto } from '../stock/dto/add-stock.dto';
 import { OrderService } from '../order/order.service';
 import { FulfilOrderDto } from '../order/dto/fulfil-order.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
+import { CheckoutDto } from '../subscription/dto/checkout.dto';
 
 @Controller('seller')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -35,6 +37,7 @@ export class SellerController {
     private readonly stockService: StockService,
     private readonly ledgerService: LedgerService,
     private readonly orderService: OrderService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   @Get('me')
@@ -121,5 +124,18 @@ export class SellerController {
     @Body() dto: FulfilOrderDto,
   ) {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
+  }
+
+  @Get('subscription')
+  async getSubscription(@Req() req: any) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    const sub = await this.subscriptionService.getSellerSubscription(seller.id);
+    return sub ?? { status: 'NONE', message: 'Tidak ada langganan aktif' };
+  }
+
+  @Post('subscription/checkout')
+  async subscriptionCheckout(@Req() req: any, @Body() dto: CheckoutDto) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    return this.subscriptionService.checkout(seller.id, dto.planId);
   }
 }
