@@ -6,6 +6,7 @@ import { DanaService } from '../dana/dana.service';
 import { PaymentService } from '../payment/payment.service';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('OrderService', () => {
   let service: OrderService;
@@ -13,8 +14,10 @@ describe('OrderService', () => {
   let markup: any;
   let dana: any;
   let payment: any;
+  let expiryQueue: any;
 
   beforeEach(async () => {
+    expiryQueue = { add: jest.fn() };
     prisma = {
       product: { findFirst: jest.fn() },
       stockUnit: { findFirst: jest.fn(), update: jest.fn() },
@@ -44,6 +47,7 @@ describe('OrderService', () => {
           provide: ConfigService,
           useValue: { get: (k: string) => (k === 'ORDER_TTL_MINUTES' ? 15 : undefined) },
         },
+        { provide: getQueueToken('order-expiry'), useValue: expiryQueue },
       ],
     }).compile();
 

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { MarkupService } from '../markup/markup.service';
 import { DanaService } from '../dana/dana.service';
@@ -19,6 +21,7 @@ export class OrderService {
     private readonly danaService: DanaService,
     private readonly paymentService: PaymentService,
     private readonly config: ConfigService,
+    @InjectQueue('order-expiry') private readonly expiryQueue: Queue,
   ) {}
 
   async createOrder(params: CreateOrderParams) {
@@ -71,6 +74,12 @@ export class OrderService {
 
       const qrImage = await this.paymentService.generateQrImage(
         danaResult.qrContent,
+      );
+
+      await this.expiryQueue.add(
+        'expire',
+        { orderId: order.id },
+        { delay: ttl * 60 * 1000 },
       );
 
       return {

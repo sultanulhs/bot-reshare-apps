@@ -8,6 +8,7 @@ import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { MobileModule } from './mobile/mobile.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TelegramModule } from './telegram/telegram.module';
     AuthModule,
     MobileModule,
     TelegramModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],
