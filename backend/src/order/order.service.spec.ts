@@ -7,6 +7,8 @@ import { PaymentService } from '../payment/payment.service';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
+import { CryptoService } from '../crypto/crypto.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 describe('OrderService', () => {
   let service: OrderService;
@@ -15,14 +17,32 @@ describe('OrderService', () => {
   let dana: any;
   let payment: any;
   let expiryQueue: any;
+  let cryptoService: any;
+  let telegramService: any;
 
   beforeEach(async () => {
     expiryQueue = { add: jest.fn() };
     prisma = {
       product: { findFirst: jest.fn() },
-      stockUnit: { findFirst: jest.fn(), update: jest.fn() },
-      order: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      stockUnit: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
+      order: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      ledgerEntry: { create: jest.fn() },
       $transaction: jest.fn((fn: any) => fn(prisma)),
+    };
+    cryptoService = {
+      encrypt: jest.fn().mockReturnValue({
+        ciphertext: 'enc',
+        iv: 'iv',
+        authTag: 'tag',
+      }),
+    };
+    telegramService = {
+      bot: { api: { sendMessage: jest.fn().mockResolvedValue({}) } },
     };
 
     markup = { computeMarkup: jest.fn().mockResolvedValue(300) };
@@ -48,6 +68,8 @@ describe('OrderService', () => {
           useValue: { get: (k: string) => (k === 'ORDER_TTL_MINUTES' ? 15 : undefined) },
         },
         { provide: getQueueToken('order-expiry'), useValue: expiryQueue },
+        { provide: CryptoService, useValue: cryptoService },
+        { provide: TelegramService, useValue: telegramService },
       ],
     }).compile();
 

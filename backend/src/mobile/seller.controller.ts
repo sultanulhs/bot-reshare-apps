@@ -22,6 +22,8 @@ import { SubmitProfileDto } from '../seller/dto/submit-profile.dto';
 import { CreateProductDto } from '../catalog/dto/create-product.dto';
 import { UpdateProductDto } from '../catalog/dto/update-product.dto';
 import { AddStockDto } from '../stock/dto/add-stock.dto';
+import { OrderService } from '../order/order.service';
+import { FulfilOrderDto } from '../order/dto/fulfil-order.dto';
 
 @Controller('seller')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,6 +34,7 @@ export class SellerController {
     private readonly catalogService: CatalogService,
     private readonly stockService: StockService,
     private readonly ledgerService: LedgerService,
+    private readonly orderService: OrderService,
   ) {}
 
   @Get('me')
@@ -102,5 +105,21 @@ export class SellerController {
   async getSales(@Req() req: any) {
     const seller = await this.sellerService.getStatus(req.user.sub);
     return this.ledgerService.getSales(seller.id);
+  }
+
+  @Get('pending-fulfillments')
+  @UseGuards(ActiveSellerGuard)
+  getPendingFulfillments(@Req() req: any) {
+    return this.orderService.getSellerPendingFulfillments(req.seller.id);
+  }
+
+  @Post('orders/:id/fulfill')
+  @UseGuards(ActiveSellerGuard)
+  fulfilOrder(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: FulfilOrderDto,
+  ) {
+    return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
   }
 }

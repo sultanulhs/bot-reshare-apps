@@ -9,6 +9,7 @@ import { MarkupModule } from '../markup/markup.module';
 import { BotConfigModule } from '../botconfig/botconfig.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { AdminStatsModule } from '../admin/admin-stats.module';
+import { OrderModule } from '../order/order.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AdminStatsModule } from '../admin/admin-stats.module';
     BotConfigModule,
     SubscriptionModule,
     AdminStatsModule,
+    OrderModule,
   ],
   controllers: [SellerController, AdminController],
 })

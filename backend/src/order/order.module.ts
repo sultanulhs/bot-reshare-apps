@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { OrderService } from './order.service';
 import { OrderExpiryProcessor } from './order-expiry.processor';
 import { MarkupModule } from '../markup/markup.module';
 import { DanaModule } from '../dana/dana.module';
 import { PaymentModule } from '../payment/payment.module';
+import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { PaymentModule } from '../payment/payment.module';
     MarkupModule,
     DanaModule,
     PaymentModule,
+    forwardRef(() => TelegramModule),
   ],
   providers: [OrderService, OrderExpiryProcessor],
   exports: [OrderService],
