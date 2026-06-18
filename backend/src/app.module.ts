@@ -7,6 +7,7 @@ import { QueueModule } from './queue/queue.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { MobileModule } from './mobile/mobile.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MobileModule } from './mobile/mobile.module';
     CryptoModule,
     AuthModule,
     MobileModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],
