@@ -10,6 +10,7 @@ import { MobileModule } from './mobile/mobile.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { OrderModule } from './order/order.module';
 import { WebhookModule } from './webhook/webhook.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { WebhookModule } from './webhook/webhook.module';
     TelegramModule,
     OrderModule,
     WebhookModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
