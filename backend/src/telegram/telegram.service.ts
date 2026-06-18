@@ -4,6 +4,7 @@ import { Bot, Context } from 'grammy';
 import { PrismaService } from '../prisma/prisma.service';
 import { BotConfigService } from '../botconfig/botconfig.service';
 import { CatalogService } from '../catalog/catalog.service';
+import { OrderService } from '../order/order.service';
 import { createBuyerComposer } from './composers/buyer.composer';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class TelegramService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly botConfigService: BotConfigService,
     private readonly catalogService: CatalogService,
+    private readonly orderService: OrderService,
   ) {
     const token = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
     this.bot = new Bot<Context>(token);
@@ -26,6 +28,7 @@ export class TelegramService implements OnModuleInit {
       this.prisma,
       this.botConfigService,
       this.catalogService,
+      this.orderService,
     );
     this.bot.use(buyerComposer);
 

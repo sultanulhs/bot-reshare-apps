@@ -1,12 +1,14 @@
-import { Composer, InlineKeyboard } from 'grammy';
+import { Composer, InlineKeyboard, InputFile } from 'grammy';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BotConfigService } from '../../botconfig/botconfig.service';
 import { CatalogService } from '../../catalog/catalog.service';
+import { OrderService } from '../../order/order.service';
 
 export function createBuyerComposer(
   prisma: PrismaService,
   botConfigService: BotConfigService,
   catalogService: CatalogService,
+  orderService: OrderService,
 ) {
   const composer = new Composer();
 
@@ -130,12 +132,39 @@ export function createBuyerComposer(
   composer.callbackQuery(/^confirm_(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     const productId = ctx.match![1];
+    const tgUserId = BigInt(ctx.from.id);
 
-    await ctx.reply(
-      `⏳ Pesanan sedang diproses...\n\n` +
-        `Fitur pembayaran QRIS akan tersedia di update berikutnya.\n` +
-        `Product ID: ${productId}`,
-    );
+    const affiliation = await prisma.buyerAffiliation.findUnique({
+      where: { buyerTgUserId: tgUserId },
+    });
+
+    if (!affiliation) {
+      await ctx.reply('⚠️ Anda belum terhubung ke toko.');
+      return;
+    }
+
+    try {
+      const order = await orderService.createOrder({
+        buyerTgUserId: tgUserId,
+        productId,
+        sellerId: affiliation.sellerId,
+      });
+
+      await ctx.replyWithPhoto(
+        new InputFile(order.qrImage, 'qris.png'),
+        {
+          caption:
+            `💳 *Pembayaran QRIS*\n\n` +
+            `Total: Rp${order.totalAmount.toLocaleString('id-ID')}\n` +
+            `Berlaku sampai: ${order.expiresAt.toLocaleString('id-ID')}\n\n` +
+            `Scan QR di atas untuk membayar via DANA.\n` +
+            `Order ID: \`${order.orderId}\``,
+          parse_mode: 'Markdown',
+        },
+      );
+    } catch (err: any) {
+      await ctx.reply(`❌ Gagal membuat pesanan: ${err.message}`);
+    }
   });
 
   composer.callbackQuery('myorders', async (ctx) => {
