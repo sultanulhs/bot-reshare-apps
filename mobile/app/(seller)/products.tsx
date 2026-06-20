@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import { useState } from 'react';
+import { View, Text, SectionList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { useState, useMemo } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
 
@@ -118,6 +118,21 @@ export default function ProductsScreen() {
     });
   };
 
+  const sections = useMemo(() => {
+    if (!apps) return [];
+    const groups: Record<string, { icon?: string; apps: App[] }> = {};
+    apps.forEach((app) => {
+      const catName = app.template?.category?.name || 'Lainnya';
+      const catIcon = app.template?.category?.icon || '📦';
+      if (!groups[catName]) groups[catName] = { icon: catIcon, apps: [] };
+      groups[catName].apps.push(app);
+    });
+    return Object.entries(groups).map(([title, { icon, apps: data }]) => ({
+      title: `${icon} ${title}`,
+      data,
+    }));
+  }, [apps]);
+
   const selectedCategory = categories?.find((c) => c.id === form.categoryId);
   const selectedTemplate = templates?.find((t) => t.id === form.templateId);
 
@@ -127,11 +142,13 @@ export default function ProductsScreen() {
         <Text style={styles.addBtnText}>+ Tambah Aplikasi</Text>
       </TouchableOpacity>
 
-      <FlatList
-        data={apps}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
         renderItem={({ item }) => {
-          const categoryName = item.template?.category?.name || '-';
           const appName = item.template?.name || '-';
           const durationCount = item._count?.durations ?? 0;
           const stockCount = item.stockCount ?? 0;
@@ -146,7 +163,6 @@ export default function ProductsScreen() {
               }
             >
               <Text style={styles.cardTitle}>{appName}</Text>
-              <Text style={styles.cardSub}>{categoryName}</Text>
               <View style={styles.cardRow}>
                 <Text style={styles.cardMeta}>{durationCount} durasi</Text>
                 <Text style={styles.cardMeta}>{stockCount} stok</Text>
@@ -359,8 +375,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff', borderRadius: 8, padding: 16, marginBottom: 8, elevation: 1,
   },
+  sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
-  cardSub: { fontSize: 13, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
   cardMeta: { fontSize: 12, color: '#888' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },

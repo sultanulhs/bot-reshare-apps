@@ -11,6 +11,16 @@ interface Plan {
   active: boolean;
 }
 
+function formatNumber(val: number | string): string {
+  const num = typeof val === 'string' ? parseInt(String(val).replace(/\./g, '')) : val;
+  if (isNaN(num) || num === 0) return '';
+  return num.toLocaleString('id-ID');
+}
+
+function parseNumber(str: string): number {
+  return parseInt(str.replace(/\./g, '')) || 0;
+}
+
 function formatRupiah(value: number): string {
   return 'Rp ' + value.toLocaleString('id-ID');
 }
@@ -116,14 +126,14 @@ export default function SettingsScreen() {
           ))}
         </View>
         {markupForm.markupMode === 'FIXED' ? (
-          <TextInput style={styles.input} placeholder="Nilai markup (Rp)" value={markupForm.markupValue}
-            onChangeText={(v) => setMarkupForm({ ...markupForm, markupValue: v })} keyboardType="numeric" />
+          <TextInput style={styles.input} placeholder="Nilai markup (Rp)" value={formatNumber(markupForm.markupValue)}
+            onChangeText={(v) => setMarkupForm({ ...markupForm, markupValue: v.replace(/\./g, '') })} keyboardType="numeric" />
         ) : (
           <View style={styles.row}>
-            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Min" value={markupForm.markupMin}
-              onChangeText={(v) => setMarkupForm({ ...markupForm, markupMin: v })} keyboardType="numeric" />
-            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Max" value={markupForm.markupMax}
-              onChangeText={(v) => setMarkupForm({ ...markupForm, markupMax: v })} keyboardType="numeric" />
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Min" value={formatNumber(markupForm.markupMin)}
+              onChangeText={(v) => setMarkupForm({ ...markupForm, markupMin: v.replace(/\./g, '') })} keyboardType="numeric" />
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Max" value={formatNumber(markupForm.markupMax)}
+              onChangeText={(v) => setMarkupForm({ ...markupForm, markupMax: v.replace(/\./g, '') })} keyboardType="numeric" />
           </View>
         )}
         <TouchableOpacity style={styles.button} onPress={() => saveMarkup.mutate()}>
@@ -145,10 +155,10 @@ export default function SettingsScreen() {
         <View key={index} style={styles.card}>
           <TextInput style={styles.input} placeholder="Nama paket" value={plan.name}
             onChangeText={(v) => updatePlan(index, 'name', v)} />
-          <TextInput style={styles.input} placeholder="Harga (Rp)" value={String(plan.price || '')}
-            onChangeText={(v) => updatePlan(index, 'price', v === '' ? 0 : parseInt(v) || 0)} keyboardType="numeric" />
-          <TextInput style={styles.input} placeholder="Periode (hari)" value={String(plan.periodDays || '')}
-            onChangeText={(v) => updatePlan(index, 'periodDays', v === '' ? 0 : parseInt(v) || 0)} keyboardType="numeric" />
+          <TextInput style={styles.input} placeholder="Harga (Rp)" value={formatNumber(plan.price)}
+            onChangeText={(v) => updatePlan(index, 'price', parseNumber(v))} keyboardType="numeric" />
+          <TextInput style={styles.input} placeholder="Periode (hari)" value={formatNumber(plan.periodDays)}
+            onChangeText={(v) => updatePlan(index, 'periodDays', parseNumber(v))} keyboardType="numeric" />
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Aktif</Text>
             <Switch value={plan.active} onValueChange={(v) => updatePlan(index, 'active', v)} />

@@ -2,14 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   StyleSheet,
   Alert,
   Modal,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import api from '../../src/lib/api';
 
@@ -36,6 +36,16 @@ const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
   AKUN_READY: 'Akun Ready',
   MANUAL: 'Manual',
 };
+
+function formatNumber(val: number | string): string {
+  const num = typeof val === 'string' ? parseInt(String(val).replace(/\./g, '')) : val;
+  if (isNaN(num) || num === 0) return '';
+  return num.toLocaleString('id-ID');
+}
+
+function parseNumber(str: string): number {
+  return parseInt(str.replace(/\./g, '')) || 0;
+}
 
 function formatRupiah(value: number): string {
   return 'Rp ' + value.toLocaleString('id-ID');
@@ -83,14 +93,14 @@ export default function AppDetailScreen() {
       Alert.alert('Error', 'Jumlah hari harus valid');
       return;
     }
-    if (!form.basePrice || parseInt(form.basePrice) <= 0) {
+    if (!form.basePrice || parseNumber(form.basePrice) <= 0) {
       Alert.alert('Error', 'Harga harus valid');
       return;
     }
     addDuration.mutate({
       label: form.label.trim(),
       days: parseInt(form.days),
-      basePrice: parseInt(form.basePrice),
+      basePrice: parseNumber(form.basePrice),
       productType: form.productType,
       ...(form.productType === 'MANUAL' && form.buyerInfoLabel.trim()
         ? { buyerInfoLabel: form.buyerInfoLabel.trim() }
@@ -99,6 +109,20 @@ export default function AppDetailScreen() {
   };
 
   const durations = appDetail?.durations ?? [];
+
+  const sections = useMemo(() => {
+    if (!durations.length) return [];
+    const groups: Record<ProductType, Duration[]> = { AKUN_READY: [], MANUAL: [] };
+    durations.forEach((d) => {
+      if (groups[d.productType]) groups[d.productType].push(d);
+    });
+    return Object.entries(groups)
+      .filter(([, items]) => items.length > 0)
+      .map(([type, data]) => ({
+        title: PRODUCT_TYPE_LABELS[type as ProductType],
+        data,
+      }));
+  }, [durations]);
 
   return (
     <View style={styles.container}>
@@ -111,9 +135,12 @@ export default function AppDetailScreen() {
         <Text style={styles.addBtnText}>+ Tambah Durasi</Text>
       </TouchableOpacity>
 
-      <FlatList
-        data={durations}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
@@ -130,9 +157,6 @@ export default function AppDetailScreen() {
           >
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{item.label}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{PRODUCT_TYPE_LABELS[item.productType]}</Text>
-              </View>
             </View>
             <Text style={styles.cardPrice}>{formatRupiah(item.basePrice)}</Text>
             <Text style={styles.cardMeta}>
@@ -166,8 +190,8 @@ export default function AppDetailScreen() {
             <TextInput
               style={styles.input}
               placeholder="Harga dasar (Rupiah)"
-              value={form.basePrice}
-              onChangeText={(v) => setForm({ ...form, basePrice: v })}
+              value={formatNumber(form.basePrice)}
+              onChangeText={(v) => setForm({ ...form, basePrice: v.replace(/\./g, '') })}
               keyboardType="numeric"
             />
 
@@ -225,6 +249,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addBtnText: { color: '#fff', fontWeight: '600' },
+  sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 8,
