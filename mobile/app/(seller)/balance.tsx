@@ -1,8 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
 import api from '../../src/lib/api';
 
 export default function BalanceScreen() {
+  const queryClient = useQueryClient();
+
   const { data: balance } = useQuery({
     queryKey: ['seller-balance'],
     queryFn: () => api.get('/seller/balance').then((r) => r.data),
@@ -12,6 +15,16 @@ export default function BalanceScreen() {
     queryKey: ['seller-sales'],
     queryFn: () => api.get('/seller/sales').then((r) => r.data),
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['seller-balance'] }),
+      queryClient.invalidateQueries({ queryKey: ['seller-sales'] }),
+    ]);
+    setRefreshing(false);
+  }, [queryClient]);
 
   return (
     <View style={styles.container}>
@@ -25,6 +38,7 @@ export default function BalanceScreen() {
       <FlatList
         data={sales}
         keyExtractor={(_, i) => String(i)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Text style={styles.rowTitle}>{item.productTitle}</Text>

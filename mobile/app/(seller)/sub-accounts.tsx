@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Modal,
+  Alert, Modal, BackHandler, RefreshControl,
 } from 'react-native';
-import { useState } from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import api from '../../src/lib/api';
 
 interface SubAccount {
@@ -29,10 +29,31 @@ export default function SubAccountsScreen() {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
 
-  const { data: subAccounts, isLoading } = useQuery<SubAccount[]>({
+  const { data: subAccounts, isLoading, refetch } = useQuery<SubAccount[]>({
     queryKey: ['seller-sub-accounts', accountId],
     queryFn: () => api.get(`/seller/accounts/${accountId}/sub-accounts`).then((r) => r.data),
   });
+
+  const handleBack = useCallback(() => {
+    router.push({ pathname: '/(seller)/add-account', params: { durationId: durationId!, durationLabel: durationLabel || '', appId: appId!, appName: appName || '' } });
+  }, [durationId, durationLabel, appId, appName]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleBack])
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const addSubAccount = useMutation({
     mutationFn: () => api.post(`/seller/accounts/${accountId}/sub-accounts`, { name, pin }),
@@ -56,7 +77,7 @@ export default function SubAccountsScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.push({ pathname: '/(seller)/add-account', params: { durationId: durationId!, durationLabel: durationLabel || '', appId: appId!, appName: appName || '' } })}>
+      <TouchableOpacity onPress={handleBack}>
         <Text style={styles.backBtn}>← Kembali</Text>
       </TouchableOpacity>
 
@@ -70,6 +91,7 @@ export default function SubAccountsScreen() {
       <FlatList
         data={subAccounts}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardRow}>

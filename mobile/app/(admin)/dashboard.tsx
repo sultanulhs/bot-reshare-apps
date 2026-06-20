@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
@@ -13,13 +14,20 @@ export default function DashboardScreen() {
     queryClient.clear();
     router.replace('/login');
   };
-  const { data: stats } = useQuery({
+  const { data: stats, refetch } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: () => api.get('/admin/stats').then((r) => r.data),
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       <Text style={styles.title}>Dashboard Admin</Text>
 
       <View style={styles.grid}>

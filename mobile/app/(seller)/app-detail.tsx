@@ -8,9 +8,11 @@ import {
   StyleSheet,
   Alert,
   Modal,
+  BackHandler,
+  RefreshControl,
 } from 'react-native';
-import { useState, useMemo } from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useState, useMemo, useCallback } from 'react';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import api from '../../src/lib/api';
 
 type ProductType = 'AKUN_READY' | 'MANUAL';
@@ -68,10 +70,31 @@ export default function AppDetailScreen() {
     buyerInfoLabel: '',
   });
 
-  const { data: appDetail, isLoading } = useQuery<AppDetail>({
+  const { data: appDetail, isLoading, refetch } = useQuery<AppDetail>({
     queryKey: ['seller-app', appId],
     queryFn: () => api.get(`/seller/apps/${appId}`).then((r) => r.data),
   });
+
+  const handleBack = useCallback(() => {
+    router.push('/(seller)/products');
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleBack])
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const addDuration = useMutation({
     mutationFn: (data: {
@@ -128,7 +151,7 @@ export default function AppDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/(seller)/products')}>
+      <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
         <Text style={styles.backBtnText}>← Kembali</Text>
       </TouchableOpacity>
       <Text style={styles.header}>{appName || appDetail?.template?.name || 'Detail Aplikasi'}</Text>
@@ -140,6 +163,7 @@ export default function AppDetailScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderSectionHeader={({ section: { title } }) => (
           <Text style={styles.sectionHeader}>{title}</Text>
         )}

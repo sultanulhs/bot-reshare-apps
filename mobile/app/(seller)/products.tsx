@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, SectionList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import { useState, useMemo } from 'react';
+import { View, Text, SectionList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { useState, useMemo, useCallback } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
 
@@ -39,10 +39,17 @@ export default function ProductsScreen() {
   const [customName, setCustomName] = useState('');
   const [form, setForm] = useState({ categoryId: '', templateId: '', notes: '' });
 
-  const { data: apps, isLoading } = useQuery<App[]>({
+  const { data: apps, isLoading, refetch } = useQuery<App[]>({
     queryKey: ['seller-apps'],
     queryFn: () => api.get('/seller/apps').then((r) => r.data),
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const { data: categories, isLoading: catsLoading } = useQuery<Category[]>({
     queryKey: ['seller-categories'],
@@ -145,6 +152,7 @@ export default function ProductsScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderSectionHeader={({ section: { title } }) => (
           <Text style={styles.sectionHeader}>{title}</Text>
         )}

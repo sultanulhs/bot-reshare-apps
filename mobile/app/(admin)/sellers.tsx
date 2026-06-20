@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Alert,
-  Modal, ScrollView, TextInput, ActivityIndicator,
+  Modal, ScrollView, TextInput, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import api from '../../src/lib/api';
 
@@ -34,13 +34,20 @@ export default function SellersScreen() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
 
-  const { data: sellers, isLoading } = useQuery({
+  const { data: sellers, isLoading, refetch } = useQuery({
     queryKey: ['admin-sellers', filter],
     queryFn: () => {
       const params = filter !== 'Semua' ? `?status=${filter}` : '';
       return api.get(`/admin/sellers${params}`).then((r) => r.data);
     },
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const { data: detail, isLoading: detailLoading } = useQuery({
     queryKey: ['admin-seller-detail', selectedId],
@@ -106,6 +113,7 @@ export default function SellersScreen() {
         <FlatList
           data={sellers}
           keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.card} onPress={() => setSelectedId(item.id)}>
               <View style={styles.cardHeader}>

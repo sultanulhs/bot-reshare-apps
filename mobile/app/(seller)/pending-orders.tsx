@@ -8,8 +8,9 @@ import {
   StyleSheet,
   Alert,
   Modal,
+  RefreshControl,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import api from '../../src/lib/api';
 
 interface PendingOrder {
@@ -26,10 +27,17 @@ export default function PendingOrdersScreen() {
   const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
   const [credentials, setCredentials] = useState('');
 
-  const { data: orders, isLoading } = useQuery<PendingOrder[]>({
+  const { data: orders, isLoading, refetch } = useQuery<PendingOrder[]>({
     queryKey: ['seller-pending-orders'],
     queryFn: () => api.get('/seller/pending-orders').then((r) => r.data),
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const fulfillOrder = useMutation({
     mutationFn: (orderId: string) =>
@@ -58,6 +66,7 @@ export default function PendingOrdersScreen() {
       <FlatList
         data={orders}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => {
           const createdDate = new Date(item.createdAt).toLocaleDateString('id-ID', {
             day: 'numeric',

@@ -50,20 +50,34 @@ export class CatalogService {
         },
         durations: {
           where: { active: true },
-          include: {
-            _count: { select: { accounts: true } },
-          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return apps.map((app) => ({
-      ...app,
-      _count: { durations: app.durations.length },
-      stockCount: app.durations.reduce((sum, d) => sum + d._count.accounts, 0),
-      durations: undefined,
-    }));
+    const appsWithStock = await Promise.all(
+      apps.map(async (app) => {
+        const stockCount = await this.prisma.subAccount.count({
+          where: {
+            status: 'AVAILABLE',
+            account: {
+              duration: { appId: app.id },
+            },
+          },
+        });
+        return {
+          id: app.id,
+          templateId: app.templateId,
+          template: app.template,
+          notes: app.notes,
+          active: app.active,
+          createdAt: app.createdAt,
+          _count: { durations: app.durations.length },
+          stockCount,
+        };
+      }),
+    );
+    return appsWithStock;
   }
 
   async createApp(sellerId: string, dto: CreateAppDto) {
@@ -149,13 +163,6 @@ export class CatalogService {
         },
         durations: {
           where: { active: true },
-          include: {
-            _count: {
-              select: {
-                accounts: { where: { status: 'AVAILABLE' } },
-              },
-            },
-          },
         },
       },
     });
@@ -164,17 +171,26 @@ export class CatalogService {
       throw new NotFoundException('App not found');
     }
 
+    const durationsWithStock = await Promise.all(
+      app.durations.map(async (d) => {
+        const stockCount = await this.prisma.subAccount.count({
+          where: { status: 'AVAILABLE', account: { durationId: d.id } },
+        });
+        return {
+          id: d.id,
+          label: d.label,
+          days: d.days,
+          basePrice: d.basePrice,
+          productType: d.productType,
+          buyerInfoLabel: d.buyerInfoLabel,
+          stockCount,
+        };
+      }),
+    );
+
     return {
       ...app,
-      durations: app.durations.map((d) => ({
-        id: d.id,
-        label: d.label,
-        days: d.days,
-        basePrice: d.basePrice,
-        productType: d.productType,
-        buyerInfoLabel: d.buyerInfoLabel,
-        stockCount: d._count.accounts,
-      })),
+      durations: durationsWithStock,
     };
   }
 }

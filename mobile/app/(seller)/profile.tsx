@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
@@ -80,10 +80,22 @@ export default function ProfileScreen() {
     });
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refetchMe(),
+      refetchSub(),
+      queryClient.invalidateQueries({ queryKey: ['seller-store-link'] }),
+      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] }),
+    ]);
+    setRefreshing(false);
+  }, [refetchMe, refetchSub, queryClient]);
+
   const canSetStoreCode = me && ['APPROVED', 'PROFILE_SUBMITTED', 'ACTIVE'].includes(me.status);
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       {/* Seller Info Card */}
       <View style={styles.card}>
         <Text style={styles.name}>{me?.ownerName}</Text>

@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Modal,
+  Alert, Modal, BackHandler, RefreshControl,
 } from 'react-native';
-import { useState } from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import api from '../../src/lib/api';
 
 interface Account {
@@ -28,10 +28,31 @@ export default function AddAccountScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const { data: accounts, isLoading } = useQuery<Account[]>({
+  const { data: accounts, isLoading, refetch } = useQuery<Account[]>({
     queryKey: ['seller-accounts', durationId],
     queryFn: () => api.get(`/seller/durations/${durationId}/accounts`).then((r) => r.data),
   });
+
+  const handleBack = useCallback(() => {
+    router.push({ pathname: '/(seller)/app-detail', params: { appId: appId!, appName: appName || '' } });
+  }, [appId, appName]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleBack])
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const addAccount = useMutation({
     mutationFn: () => api.post(`/seller/durations/${durationId}/accounts`, { email, password }),
@@ -54,7 +75,7 @@ export default function AddAccountScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.push({ pathname: '/(seller)/app-detail', params: { appId: appId!, appName: appName || '' } })}>
+      <TouchableOpacity onPress={handleBack}>
         <Text style={styles.backBtn}>← Kembali</Text>
       </TouchableOpacity>
 
@@ -67,6 +88,7 @@ export default function AddAccountScreen() {
       <FlatList
         data={accounts}
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
