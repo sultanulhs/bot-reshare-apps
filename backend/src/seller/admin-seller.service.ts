@@ -43,8 +43,9 @@ export class AdminSellerService {
     const seller = await this.prisma.seller.findUnique({
       where: { id: sellerId },
       include: {
-        user: { select: { email: true } },
+        user: { select: { email: true, emailVerified: true } },
         profile: true,
+        _count: { select: { products: true } },
       },
     });
 
@@ -59,6 +60,11 @@ export class AdminSellerService {
       email: seller.user.email,
       phone: seller.phone,
       status: seller.status,
+      storeCode: seller.storeCode,
+      emailVerified: seller.user.emailVerified,
+      phoneVerified: seller.phoneVerified,
+      productCount: seller._count.products,
+      createdAt: seller.createdAt,
     };
 
     if (
