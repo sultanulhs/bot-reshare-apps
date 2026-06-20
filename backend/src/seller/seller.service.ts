@@ -52,7 +52,12 @@ export class SellerService {
       );
     }
 
-    const encrypted = this.crypto.encrypt(dto.payoutAccount);
+    const payoutData = JSON.stringify({
+      bankName: dto.bankName,
+      accountNumber: dto.accountNumber,
+      accountHolder: dto.accountHolder,
+    });
+    const encrypted = this.crypto.encrypt(payoutData);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.sellerProfile.create({

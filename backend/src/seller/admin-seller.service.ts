@@ -69,13 +69,20 @@ export class AdminSellerService {
         `AUDIT: Admin viewed payout for seller ${seller.id}`,
       );
 
-      const payoutAccount = this.crypto.decrypt(
+      const decrypted = this.crypto.decrypt(
         seller.profile.encPayout,
         seller.profile.payoutIv,
         seller.profile.payoutTag,
       );
 
-      return { ...base, profile: { payoutAccount } };
+      let profile: any;
+      try {
+        profile = JSON.parse(decrypted);
+      } catch {
+        profile = { payoutAccount: decrypted };
+      }
+
+      return { ...base, profile };
     }
 
     return base;
