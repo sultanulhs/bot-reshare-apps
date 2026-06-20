@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,7 +20,7 @@ export class SellerService {
   async getStatus(userId: string) {
     const seller = await this.prisma.seller.findUnique({
       where: { userId },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, emailVerified: true } } },
     });
     if (!seller) {
       throw new NotFoundException('Seller not found');
@@ -31,6 +32,8 @@ export class SellerService {
       status: seller.status,
       email: seller.user.email,
       storeCode: seller.storeCode,
+      emailVerified: seller.user.emailVerified,
+      phoneVerified: seller.phoneVerified,
     };
   }
 
@@ -67,6 +70,34 @@ export class SellerService {
 
       return { status: updated.status };
     });
+  }
+
+  async setStoreCode(userId: string, storeCode: string) {
+    const seller = await this.prisma.seller.findUnique({ where: { userId } });
+    if (!seller) throw new NotFoundException('Seller not found');
+    if (seller.storeCode) {
+      throw new BadRequestException('Store code sudah diset dan tidak bisa diubah');
+    }
+    if (!['APPROVED', 'PROFILE_SUBMITTED', 'ACTIVE'].includes(seller.status)) {
+      throw new BadRequestException('Status belum disetujui');
+    }
+
+    // Validate format: A-Za-z0-9_- , 3-64 chars
+    if (!/^[A-Za-z0-9_-]{3,64}$/.test(storeCode)) {
+      throw new BadRequestException('Format kode toko tidak valid');
+    }
+
+    // Check unique
+    const existing = await this.prisma.seller.findUnique({ where: { storeCode } });
+    if (existing) {
+      throw new ConflictException('Kode toko sudah digunakan');
+    }
+
+    await this.prisma.seller.update({
+      where: { id: seller.id },
+      data: { storeCode },
+    });
+    return { storeCode };
   }
 
   async getStoreLink(userId: string) {

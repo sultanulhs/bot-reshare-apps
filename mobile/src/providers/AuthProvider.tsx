@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { AuthContext, AuthUser, RegisterData, RegisterResult } from '../lib/auth';
-import api from '../lib/api';
+import { AuthContext, AuthUser, RegisterData } from '../lib/auth';
 import axios from 'axios';
 
 const API_URL = 'http://192.168.1.3:3000/api';
@@ -48,9 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return userData;
   }, []);
 
-  const register = useCallback(async (regData: RegisterData): Promise<RegisterResult> => {
-    const { data } = await axios.post(`${API_URL}/auth/register`, regData);
-    return { verifyToken: data.verifyToken };
+  const register = useCallback(async (regData: RegisterData): Promise<void> => {
+    await axios.post(`${API_URL}/auth/register`, regData);
   }, []);
 
   const logout = useCallback(async () => {

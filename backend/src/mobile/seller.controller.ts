@@ -19,6 +19,7 @@ import { CatalogService } from '../catalog/catalog.service';
 import { StockService } from '../stock/stock.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { SubmitProfileDto } from '../seller/dto/submit-profile.dto';
+import { SetStoreCodeDto } from '../seller/dto/set-store-code.dto';
 import { CreateProductDto } from '../catalog/dto/create-product.dto';
 import { UpdateProductDto } from '../catalog/dto/update-product.dto';
 import { AddStockDto } from '../stock/dto/add-stock.dto';
@@ -26,6 +27,7 @@ import { OrderService } from '../order/order.service';
 import { FulfilOrderDto } from '../order/dto/fulfil-order.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CheckoutDto } from '../subscription/dto/checkout.dto';
+import { VerificationService } from '../verification/verification.service';
 
 @Controller('seller')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +40,7 @@ export class SellerController {
     private readonly ledgerService: LedgerService,
     private readonly orderService: OrderService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly verificationService: VerificationService,
   ) {}
 
   @Get('me')
@@ -124,6 +127,37 @@ export class SellerController {
     @Body() dto: FulfilOrderDto,
   ) {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
+  }
+
+  @Post('verify/email/send')
+  async sendEmailOtp(@Req() req: any) {
+    await this.verificationService.generateEmailOtp(req.user.sub);
+    return { message: 'Kode OTP telah dikirim ke email Anda' };
+  }
+
+  @Post('verify/email')
+  async verifyEmail(@Req() req: any, @Body() body: { code: string }) {
+    await this.verificationService.verifyEmailOtp(req.user.sub, body.code);
+    return { message: 'Email berhasil diverifikasi' };
+  }
+
+  @Post('verify/phone/start')
+  async startPhoneVerification(@Req() req: any) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    const { deepLink } = await this.verificationService.startPhoneVerification(seller.id);
+    return { deepLink };
+  }
+
+  @Post('verify/phone')
+  async verifyPhone(@Req() req: any, @Body() body: { code: string }) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    await this.verificationService.verifyPhoneOtp(seller.id, body.code);
+    return { message: 'Nomor telepon berhasil diverifikasi' };
+  }
+
+  @Post('store-code')
+  setStoreCode(@Req() req: any, @Body() dto: SetStoreCodeDto) {
+    return this.sellerService.setStoreCode(req.user.sub, dto.storeCode);
   }
 
   @Get('subscription')

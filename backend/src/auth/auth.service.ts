@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { VerificationService } from '../verification/verification.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -25,7 +24,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly verification: VerificationService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -56,16 +54,11 @@ export class AuthService {
       });
     });
 
-    // Issue verify token and trigger email OTP
-    const verifyToken = await this.verification.issueVerifyToken(user.id);
-    await this.verification.generateEmailOtp(user.id);
-
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       sellerStatus: user.seller!.status,
-      verifyToken,
     };
   }
 

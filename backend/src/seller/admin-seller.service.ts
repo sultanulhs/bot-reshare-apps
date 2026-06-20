@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
-import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class AdminSellerService {
@@ -91,14 +90,12 @@ export class AdminSellerService {
       throw new BadRequestException('Can only approve PENDING sellers');
     }
 
-    const storeCode = `store_${randomBytes(6).toString('hex')}`;
-
     const updated = await this.prisma.seller.update({
       where: { id: sellerId },
-      data: { status: 'APPROVED', storeCode },
+      data: { status: 'APPROVED' },
     });
 
-    return { id: updated.id, status: updated.status, storeCode: updated.storeCode };
+    return { id: updated.id, status: updated.status };
   }
 
   async verifyProfile(sellerId: string) {

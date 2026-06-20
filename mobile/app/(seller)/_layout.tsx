@@ -8,6 +8,8 @@ export default function SellerLayout() {
       <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarLabel: 'Profil' }} />
       <Tabs.Screen name="add-stock" options={{ href: null }} />
       <Tabs.Screen name="submit-profile" options={{ href: null }} />
+      <Tabs.Screen name="verify-email" options={{ href: null, title: 'Verifikasi Email' }} />
+      <Tabs.Screen name="verify-phone" options={{ href: null, title: 'Verifikasi HP' }} />
     </Tabs>
   );
 }

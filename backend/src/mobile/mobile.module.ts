@@ -10,6 +10,7 @@ import { BotConfigModule } from '../botconfig/botconfig.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { AdminStatsModule } from '../admin/admin-stats.module';
 import { OrderModule } from '../order/order.module';
+import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OrderModule } from '../order/order.module';
     SubscriptionModule,
     AdminStatsModule,
     OrderModule,
+    VerificationModule,
   ],
   controllers: [SellerController, AdminController],
 })

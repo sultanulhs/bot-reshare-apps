@@ -56,12 +56,11 @@ describe('AdminSellerService', () => {
   });
 
   describe('approveSeller', () => {
-    it('should transition PENDING to APPROVED and generate storeCode', async () => {
+    it('should transition PENDING to APPROVED', async () => {
       prisma.seller.findUnique.mockResolvedValue({ id: 's1', status: 'PENDING' });
       prisma.seller.update.mockResolvedValue({
         id: 's1',
         status: 'APPROVED',
-        storeCode: 'store_abc123',
       });
 
       const result = await service.approveSeller('s1');
@@ -69,10 +68,7 @@ describe('AdminSellerService', () => {
       expect(prisma.seller.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 's1' },
-          data: expect.objectContaining({
-            status: 'APPROVED',
-            storeCode: expect.stringMatching(/^store_/),
-          }),
+          data: { status: 'APPROVED' },
         }),
       );
     });

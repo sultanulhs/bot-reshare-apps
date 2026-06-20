@@ -13,18 +13,13 @@ export interface RegisterData {
   ownerName: string;
   storeName: string;
   phone: string;
-  planId?: string;
-}
-
-export interface RegisterResult {
-  verifyToken: string;
 }
 
 export interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthUser | undefined>;
-  register: (data: RegisterData) => Promise<RegisterResult>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -32,7 +27,7 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   login: async () => undefined,
-  register: async () => ({ verifyToken: '' }),
+  register: async () => {},
   logout: async () => {},
 });
 
