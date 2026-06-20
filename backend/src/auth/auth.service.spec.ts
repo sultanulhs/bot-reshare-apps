@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { VerificationService } from '../verification/verification.service';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
@@ -14,6 +15,7 @@ describe('AuthService', () => {
     $transaction: jest.Mock;
   };
   let jwt: { signAsync: jest.Mock; verifyAsync: jest.Mock };
+  let verification: { issueVerifyToken: jest.Mock; generateEmailOtp: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -27,11 +29,17 @@ describe('AuthService', () => {
       verifyAsync: jest.fn(),
     };
 
+    verification = {
+      issueVerifyToken: jest.fn().mockResolvedValue('mock-verify-token'),
+      generateEmailOtp: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwt },
+        { provide: VerificationService, useValue: verification },
         {
           provide: ConfigService,
           useValue: {
@@ -65,7 +73,8 @@ describe('AuthService', () => {
       const result = await service.register({
         email: 'test@test.com',
         password: 'password123',
-        name: 'Test Seller',
+        ownerName: 'Test Seller',
+        storeName: 'Toko Test',
         phone: '081234567890',
       });
 
@@ -74,6 +83,7 @@ describe('AuthService', () => {
         email: 'test@test.com',
         role: 'SELLER',
         sellerStatus: 'PENDING',
+        verifyToken: 'mock-verify-token',
       });
     });
 
@@ -84,7 +94,8 @@ describe('AuthService', () => {
         service.register({
           email: 'existing@test.com',
           password: 'password123',
-          name: 'Test',
+          ownerName: 'Test',
+          storeName: 'Toko Test',
           phone: '081234567890',
         }),
       ).rejects.toThrow(ConflictException);
