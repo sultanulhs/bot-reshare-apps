@@ -20,6 +20,12 @@ export const envSchema = z.object({
   JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_TTL: z.coerce.number().int().positive().default(2592000),
 
+  SMTP_HOST: z.string().default('localhost'),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  SMTP_FROM: z.string().default('noreply@reshare.com'),
+
   ORDER_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   ORDER_FULFILL_SLA_MINUTES: z.coerce.number().int().positive().default(60),
   REPORT_SLA_HOURS: z.coerce.number().int().positive().default(24),
