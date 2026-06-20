@@ -7,6 +7,7 @@ export default function SellerLayout() {
       <Tabs.Screen name="balance" options={{ title: 'Saldo', tabBarLabel: 'Saldo' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarLabel: 'Profil' }} />
       <Tabs.Screen name="add-stock" options={{ href: null }} />
+      <Tabs.Screen name="submit-profile" options={{ href: null }} />
     </Tabs>
   );
 }
