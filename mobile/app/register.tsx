@@ -33,7 +33,7 @@ export default function RegisterScreen() {
   const [plansLoading, setPlansLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API_URL}/auth/plans`)
+    axios.get(`${API_URL}/auth/verify/plans`)
       .then((res) => setPlans(res.data.filter((p: Plan) => p.active)))
       .catch(() => {})
       .finally(() => setPlansLoading(false));
