@@ -23,7 +23,6 @@ export default function ProfileScreen() {
   const [storeCodeInput, setStoreCodeInput] = useState('');
   const [storeCodeLoading, setStoreCodeLoading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState('');
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -69,20 +68,16 @@ export default function ProfileScreen() {
     setStoreCodeLoading(false);
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (!selectedPlanId) {
       Alert.alert('Error', 'Pilih paket langganan terlebih dahulu');
       return;
     }
-    setCheckoutLoading(true);
-    try {
-      const { data } = await api.post('/seller/subscription/checkout', { planId: selectedPlanId });
-      Alert.alert('Pembayaran', `QR Content:\n${data.qrContent}\n\nRef: ${data.partnerReferenceNo}`);
-      refetchSub();
-    } catch (err: any) {
-      Alert.alert('Gagal', err.response?.data?.message || 'Terjadi kesalahan');
-    }
-    setCheckoutLoading(false);
+    const selectedPlan = plans?.find((p: Plan) => p.id === selectedPlanId);
+    router.push({
+      pathname: '/(seller)/subscription-payment',
+      params: { planId: selectedPlanId, planName: selectedPlan?.name || 'Langganan' },
+    });
   };
 
   const canSetStoreCode = me && ['APPROVED', 'PROFILE_SUBMITTED', 'ACTIVE'].includes(me.status);
@@ -206,10 +201,10 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   style={styles.checkoutButton}
                   onPress={handleCheckout}
-                  disabled={checkoutLoading}
+                  disabled={false}
                 >
                   <Text style={styles.checkoutButtonText}>
-                    {checkoutLoading ? 'Memproses...' : 'Bayar Langganan'}
+                    {'Bayar Langganan'}
                   </Text>
                 </TouchableOpacity>
               </>

@@ -10,6 +10,7 @@ export default function SellerLayout() {
       <Tabs.Screen name="submit-profile" options={{ href: null }} />
       <Tabs.Screen name="verify-email" options={{ href: null, title: 'Verifikasi Email' }} />
       <Tabs.Screen name="verify-phone" options={{ href: null, title: 'Verifikasi HP' }} />
+      <Tabs.Screen name="subscription-payment" options={{ href: null, title: 'Pembayaran Langganan' }} />
     </Tabs>
   );
 }
