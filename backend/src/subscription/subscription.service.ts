@@ -77,7 +77,7 @@ export class SubscriptionService {
       await tx.ledgerEntry.create({
         data: {
           sellerId: sub.sellerId,
-          orderId: sub.id,
+          subscriptionId: sub.id,
           type: 'SUBSCRIPTION_FEE',
           amount: plan?.price ?? 0,
         },

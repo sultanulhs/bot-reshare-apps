@@ -185,14 +185,15 @@ model Order {
 }
 
 model LedgerEntry {
-  id        String     @id @default(cuid())
-  sellerId  String?
-  seller    Seller?    @relation(fields: [sellerId], references: [id])
-  orderId   String
-  order     Order      @relation(fields: [orderId], references: [id])
-  type      LedgerType
-  amount    Int
-  createdAt DateTime   @default(now())
+  id             String     @id @default(cuid())
+  sellerId       String?
+  seller         Seller?    @relation(fields: [sellerId], references: [id])
+  orderId        String?
+  order          Order?     @relation(fields: [orderId], references: [id])
+  subscriptionId String?
+  type           LedgerType
+  amount         Int
+  createdAt      DateTime   @default(now())
 }
 
 model BotConfig {
