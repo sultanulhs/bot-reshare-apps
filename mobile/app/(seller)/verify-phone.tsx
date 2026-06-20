@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
 export default function VerifyPhoneScreen() {
+  const queryClient = useQueryClient();
   const [code, setCode] = useState('');
   const [startLoading, setStartLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -29,6 +31,7 @@ export default function VerifyPhoneScreen() {
     setVerifyLoading(true);
     try {
       await api.post('/seller/verify/phone', { code });
+      queryClient.invalidateQueries({ queryKey: ['seller-me'] });
       Alert.alert('Berhasil', 'Nomor telepon berhasil diverifikasi', [
         { text: 'OK', onPress: () => router.back() },
       ]);
