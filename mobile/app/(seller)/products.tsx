@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
@@ -25,6 +25,7 @@ interface App {
 export default function ProductsScreen() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
+  const [showCatPicker, setShowCatPicker] = useState(false);
   const [form, setForm] = useState({ categoryId: '', name: '', description: '' });
 
   const { data: apps, isLoading } = useQuery<App[]>({
@@ -108,19 +109,32 @@ export default function ProductsScreen() {
             <Text style={styles.modalTitle}>Tambah Aplikasi</Text>
 
             <Text style={styles.label}>Kategori</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {categories?.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.chip, form.categoryId === cat.id && styles.chipSelected]}
-                  onPress={() => setForm({ ...form, categoryId: cat.id })}
-                >
-                  <Text style={[styles.chipText, form.categoryId === cat.id && styles.chipTextSelected]}>
-                    {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setShowCatPicker(!showCatPicker)}
+            >
+              <Text style={form.categoryId ? styles.dropdownText : styles.dropdownPlaceholder}>
+                {form.categoryId
+                  ? categories?.find((c) => c.id === form.categoryId)?.name || 'Pilih kategori'
+                  : 'Pilih kategori...'}
+              </Text>
+              <Text style={styles.dropdownArrow}>{showCatPicker ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {showCatPicker && (
+              <View style={styles.dropdownList}>
+                {categories?.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.dropdownItem, form.categoryId === cat.id && styles.dropdownItemSelected]}
+                    onPress={() => { setForm({ ...form, categoryId: cat.id }); setShowCatPicker(false); }}
+                  >
+                    <Text style={[styles.dropdownItemText, form.categoryId === cat.id && styles.dropdownItemTextSelected]}>
+                      {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <TextInput
               style={styles.input}
@@ -180,17 +194,21 @@ const styles = StyleSheet.create({
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
-  chipScroll: { marginBottom: 12 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
+  dropdown: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12,
+    marginBottom: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  chipSelected: { backgroundColor: '#2563eb' },
-  chipText: { fontSize: 14, color: '#666' },
-  chipTextSelected: { color: '#fff', fontWeight: '600' },
+  dropdownText: { fontSize: 16, color: '#333' },
+  dropdownPlaceholder: { fontSize: 16, color: '#999' },
+  dropdownArrow: { fontSize: 12, color: '#999' },
+  dropdownList: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 12,
+    backgroundColor: '#fff', maxHeight: 200, overflow: 'hidden',
+  },
+  dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  dropdownItemSelected: { backgroundColor: '#eff6ff' },
+  dropdownItemText: { fontSize: 15, color: '#333' },
+  dropdownItemTextSelected: { color: '#2563eb', fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
