@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useState } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import api from '../../src/lib/api';
 
 type ProductType = 'AKUN_READY' | 'SUB_AKUN' | 'MANUAL';
@@ -171,15 +170,16 @@ export default function AppDetailScreen() {
             />
 
             <Text style={styles.label}>Tipe Produk</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={form.productType}
-                onValueChange={(v) => setForm({ ...form, productType: v as ProductType })}
-              >
-                <Picker.Item label="Akun Ready" value="AKUN_READY" />
-                <Picker.Item label="Sub-Akun" value="SUB_AKUN" />
-                <Picker.Item label="Manual" value="MANUAL" />
-              </Picker>
+            <View style={styles.typeRow}>
+              {([['AKUN_READY', 'Akun Ready'], ['SUB_AKUN', 'Sub-Akun'], ['MANUAL', 'Manual']] as const).map(([val, label]) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[styles.typeChip, form.productType === val && styles.typeChipSelected]}
+                  onPress={() => setForm({ ...form, productType: val as ProductType })}
+                >
+                  <Text style={[styles.typeChipText, form.productType === val && styles.typeChipTextSelected]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {form.productType === 'MANUAL' && (
@@ -244,13 +244,11 @@ const styles = StyleSheet.create({
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
-  pickerWrapper: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
+  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f0f0f0' },
+  typeChipSelected: { backgroundColor: '#2563eb' },
+  typeChipText: { fontSize: 14, color: '#666' },
+  typeChipTextSelected: { color: '#fff', fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',

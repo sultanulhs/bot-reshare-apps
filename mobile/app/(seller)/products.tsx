@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import api from '../../src/lib/api';
 
 interface Category {
@@ -109,17 +108,19 @@ export default function ProductsScreen() {
             <Text style={styles.modalTitle}>Tambah Aplikasi</Text>
 
             <Text style={styles.label}>Kategori</Text>
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={form.categoryId}
-                onValueChange={(v) => setForm({ ...form, categoryId: v })}
-              >
-                <Picker.Item label="Pilih kategori..." value="" />
-                {categories?.map((cat) => (
-                  <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
-                ))}
-              </Picker>
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {categories?.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.chip, form.categoryId === cat.id && styles.chipSelected]}
+                  onPress={() => setForm({ ...form, categoryId: cat.id })}
+                >
+                  <Text style={[styles.chipText, form.categoryId === cat.id && styles.chipTextSelected]}>
+                    {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
             <TextInput
               style={styles.input}
@@ -179,13 +180,17 @@ const styles = StyleSheet.create({
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
-  pickerWrapper: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
+  chipScroll: { marginBottom: 12 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
   },
+  chipSelected: { backgroundColor: '#2563eb' },
+  chipText: { fontSize: 14, color: '#666' },
+  chipTextSelected: { color: '#fff', fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
