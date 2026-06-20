@@ -73,29 +73,34 @@ export class StockService {
       throw new NotFoundException('Duration not found');
     }
 
-    return this.prisma.account.findMany({
+    const accounts = await this.prisma.account.findMany({
       where: { durationId },
-      select: {
-        id: true,
-        durationId: true,
-        status: true,
-        createdAt: true,
-        _count: { select: { subAccounts: true } },
-      },
+      include: { _count: { select: { subAccounts: true } } },
       orderBy: { createdAt: 'desc' },
     });
+
+    return accounts.map((a) => ({
+      id: a.id,
+      email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
+      password: this.crypto.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
+      status: a.status,
+      subAccountCount: a._count.subAccounts,
+      createdAt: a.createdAt,
+    }));
   }
 
   async listSubAccounts(accountId: string) {
-    return this.prisma.subAccount.findMany({
+    const subAccounts = await this.prisma.subAccount.findMany({
       where: { accountId },
-      select: {
-        id: true,
-        accountId: true,
-        status: true,
-        createdAt: true,
-      },
       orderBy: { createdAt: 'desc' },
     });
+
+    return subAccounts.map((s) => ({
+      id: s.id,
+      name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
+      pin: this.crypto.decrypt(s.encPin, s.pinIv, s.pinTag),
+      status: s.status,
+      createdAt: s.createdAt,
+    }));
   }
 }

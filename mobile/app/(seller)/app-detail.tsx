@@ -102,6 +102,9 @@ export default function AppDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <Text style={styles.backBtnText}>← Kembali</Text>
+      </TouchableOpacity>
       <Text style={styles.header}>{appName || appDetail?.template?.name || 'Detail Aplikasi'}</Text>
 
       <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
@@ -211,6 +214,8 @@ export default function AppDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
+  backBtn: { marginBottom: 12 },
+  backBtnText: { fontSize: 15, color: '#2563eb', fontWeight: '600' },
   header: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   addBtn: {
     backgroundColor: '#2563eb',
