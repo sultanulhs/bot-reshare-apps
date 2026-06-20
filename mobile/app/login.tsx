@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useAuth } from '../src/lib/auth';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -12,7 +12,12 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
+      if (user?.role === 'ADMIN') {
+        router.replace('/(admin)/dashboard');
+      } else {
+        router.replace('/(seller)/products');
+      }
     } catch (err: any) {
       Alert.alert('Login Gagal', err.response?.data?.message || 'Terjadi kesalahan');
     }

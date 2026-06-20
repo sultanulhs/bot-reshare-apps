@@ -66,30 +66,64 @@ enum ReportStatus {
   ESCALATED
 }
 
+enum OtpChannel {
+  EMAIL
+  PHONE
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(SELLER)
-  seller       Seller?
-  createdAt    DateTime @default(now())
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  emailVerified Boolean  @default(false)
+  role          Role     @default(SELLER)
+  seller        Seller?
+  otps          Otp[]
+  createdAt     DateTime @default(now())
 }
 
 model Seller {
-  id            String          @id @default(cuid())
-  userId        String          @unique
-  user          User            @relation(fields: [userId], references: [id])
-  name          String
-  phone         String
-  storeCode     String?         @unique
-  status        SellerStatus    @default(PENDING)
-  products      Product[]
-  ledgerEntries LedgerEntry[]
-  profile       SellerProfile?
-  subscriptions Subscription[]
-  reports       Report[]
-  affiliations  BuyerAffiliation[]
-  createdAt     DateTime        @default(now())
+  id                    String                 @id @default(cuid())
+  userId                String                 @unique
+  user                  User                   @relation(fields: [userId], references: [id])
+  ownerName             String
+  storeName             String
+  phone                 String
+  phoneVerified         Boolean                @default(false)
+  tgUserId              BigInt?                @unique
+  storeCode             String?                @unique
+  status                SellerStatus           @default(PENDING)
+  products              Product[]
+  ledgerEntries         LedgerEntry[]
+  profile               SellerProfile?
+  subscriptions         Subscription[]
+  reports               Report[]
+  affiliations          BuyerAffiliation[]
+  telegramVerification  TelegramVerification?
+  createdAt             DateTime               @default(now())
+}
+
+model Otp {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  channel    OtpChannel
+  codeHash   String
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+  @@index([userId, channel])
+}
+
+model TelegramVerification {
+  id        String   @id @default(cuid())
+  sellerId  String   @unique
+  seller    Seller   @relation(fields: [sellerId], references: [id])
+  token     String   @unique
+  tgUserId  BigInt?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model SellerProfile {

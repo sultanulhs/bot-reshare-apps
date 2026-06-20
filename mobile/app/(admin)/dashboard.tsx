@@ -1,10 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import api from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
 
 export default function DashboardScreen() {
   const { logout } = useAuth();
+  const queryClient = useQueryClient();
+
+  const handleLogout = async () => {
+    await logout();
+    queryClient.clear();
+    router.replace('/login');
+  };
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: () => api.get('/admin/stats').then((r) => r.data),
@@ -33,7 +41,7 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Keluar</Text>
       </TouchableOpacity>
     </ScrollView>
