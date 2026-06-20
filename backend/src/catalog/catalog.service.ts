@@ -1,55 +1,120 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateAppDto } from './dto/create-app.dto';
+import { CreateDurationDto } from './dto/create-duration.dto';
 
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listProducts(sellerId: string) {
-    const products = await this.prisma.product.findMany({
-      where: { sellerId },
-      include: { stockUnits: { select: { status: true } } },
-    });
-
-    return products.map((p) => ({
-      id: p.id,
-      category: p.category,
-      title: p.title,
-      basePrice: p.basePrice,
-      active: p.active,
-      stockType: p.stockType,
-      stockCount: {
-        available: p.stockUnits.filter((s) => s.status === 'AVAILABLE').length,
-        locked: p.stockUnits.filter((s) => s.status === 'LOCKED').length,
-        sold: p.stockUnits.filter((s) => s.status === 'SOLD').length,
+  async getCategories(sellerId: string) {
+    return this.prisma.category.findMany({
+      where: {
+        OR: [{ isDefault: true }, { sellerId }],
       },
-    }));
+      orderBy: { name: 'asc' },
+    });
   }
 
-  async createProduct(sellerId: string, dto: CreateProductDto) {
-    return this.prisma.product.create({
+  async createCategory(sellerId: string, dto: CreateCategoryDto) {
+    return this.prisma.category.create({
+      data: {
+        name: dto.name,
+        icon: dto.icon,
+        sellerId,
+      },
+    });
+  }
+
+  async getApps(sellerId: string, categoryId?: string) {
+    const where: any = { sellerId };
+    if (categoryId) where.categoryId = categoryId;
+
+    return this.prisma.app.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true, icon: true } },
+        durations: {
+          where: { active: true },
+          select: { id: true, label: true, days: true, basePrice: true, productType: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createApp(sellerId: string, dto: CreateAppDto) {
+    return this.prisma.app.create({
       data: {
         sellerId,
-        category: dto.category,
-        title: dto.title,
-        basePrice: dto.basePrice,
+        categoryId: dto.categoryId,
+        name: dto.name,
+        description: dto.description,
       },
     });
   }
 
-  async updateProduct(sellerId: string, productId: string, dto: UpdateProductDto) {
-    const product = await this.prisma.product.findFirst({
-      where: { id: productId, sellerId },
+  async getDurations(appId: string) {
+    return this.prisma.duration.findMany({
+      where: { appId, active: true },
+      orderBy: { days: 'asc' },
     });
-    if (!product) {
-      throw new NotFoundException('Product not found');
+  }
+
+  async createDuration(sellerId: string, appId: string, dto: CreateDurationDto) {
+    const app = await this.prisma.app.findFirst({
+      where: { id: appId, sellerId },
+    });
+    if (!app) {
+      throw new NotFoundException('App not found');
     }
 
-    return this.prisma.product.update({
-      where: { id: productId },
-      data: dto,
+    return this.prisma.duration.create({
+      data: {
+        appId,
+        label: dto.label,
+        days: dto.days,
+        basePrice: dto.basePrice,
+        productType: dto.productType as any,
+        buyerInfoLabel: dto.buyerInfoLabel,
+      },
     });
+  }
+
+  async getAppWithStock(appId: string) {
+    const app = await this.prisma.app.findUnique({
+      where: { id: appId },
+      include: {
+        category: { select: { id: true, name: true, icon: true } },
+        durations: {
+          where: { active: true },
+          include: {
+            _count: {
+              select: {
+                accounts: { where: { status: 'AVAILABLE' } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!app) {
+      throw new NotFoundException('App not found');
+    }
+
+    return {
+      ...app,
+      durations: app.durations.map((d) => ({
+        id: d.id,
+        label: d.label,
+        days: d.days,
+        basePrice: d.basePrice,
+        productType: d.productType,
+        buyerInfoLabel: d.buyerInfoLabel,
+        availableStock: d._count.accounts,
+      })),
+    };
   }
 }

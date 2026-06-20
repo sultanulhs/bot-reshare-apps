@@ -18,9 +18,11 @@ describe('FulfilmentService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
-      stockUnit: {
-        findUnique: jest.fn(),
+      account: {
         update: jest.fn(),
+      },
+      subAccount: {
+        updateMany: jest.fn(),
       },
       ledgerEntry: {
         create: jest.fn(),
@@ -29,7 +31,7 @@ describe('FulfilmentService', () => {
     };
 
     crypto = {
-      decrypt: jest.fn().mockReturnValue('user@example.com:password123'),
+      decrypt: jest.fn().mockReturnValue('decrypted-value'),
     };
 
     telegram = {
@@ -58,46 +60,58 @@ describe('FulfilmentService', () => {
   });
 
   describe('handlePaymentNotification', () => {
-    it('should fulfil a PENDING order with PRE_STOCKED product', async () => {
+    it('should fulfil a PENDING order with AKUN_READY product', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'order-1',
         status: 'PENDING',
         buyerTgUserId: BigInt(12345),
-        stockUnitId: 'stock-1',
-        productId: 'prod-1',
         basePrice: 50000,
         markup: 300,
-      });
-
-      prisma.stockUnit.findUnique.mockResolvedValue({
-        id: 'stock-1',
-        encCredentials: 'enc',
-        iv: 'iv',
-        authTag: 'tag',
-        product: { title: 'Netflix', stockType: 'PRE_STOCKED', sellerId: 'seller-1' },
+        duration: {
+          productType: 'AKUN_READY',
+          label: '1 Bulan',
+          app: { name: 'Netflix', sellerId: 'seller-1' },
+        },
+        account: {
+          id: 'acc-1',
+          encEmail: 'enc-email',
+          emailIv: 'iv1',
+          emailTag: 'tag1',
+          encPassword: 'enc-pass',
+          passwordIv: 'iv2',
+          passwordTag: 'tag2',
+          subAccounts: [],
+        },
+        subAccount: null,
       });
 
       prisma.order.update.mockResolvedValue({ status: 'FULFILLED' });
+      prisma.account.update.mockResolvedValue({});
 
       await service.handlePaymentNotification({
         originalPartnerReferenceNo: 'ORD_test123',
       });
 
-      expect(prisma.order.findUnique).toHaveBeenCalledWith({
-        where: { partnerReferenceNo: 'ORD_test123' },
-      });
-      expect(crypto.decrypt).toHaveBeenCalledWith('enc', 'iv', 'tag');
+      expect(prisma.order.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { partnerReferenceNo: 'ORD_test123' },
+        }),
+      );
+      expect(crypto.decrypt).toHaveBeenCalled();
       expect(telegram.bot.api.sendMessage).toHaveBeenCalledWith(
         '12345',
-        expect.stringContaining('user@example.com:password123'),
+        expect.stringContaining('decrypted-value'),
       );
       expect(prisma.ledgerEntry.create).toHaveBeenCalledTimes(2);
     });
 
-    it('should be idempotent — skip already FULFILLED orders', async () => {
+    it('should be idempotent -- skip already FULFILLED orders', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'order-1',
         status: 'FULFILLED',
+        duration: { productType: 'AKUN_READY', app: { sellerId: 'seller-1' } },
+        account: null,
+        subAccount: null,
       });
 
       await service.handlePaymentNotification({
@@ -108,15 +122,20 @@ describe('FulfilmentService', () => {
       expect(telegram.bot.api.sendMessage).not.toHaveBeenCalled();
     });
 
-    it('should set ON_DEMAND order to WAITING_SELLER', async () => {
+    it('should set MANUAL order to WAITING_SELLER', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'order-1',
         status: 'PENDING',
         buyerTgUserId: BigInt(12345),
-        stockUnitId: null,
-        productId: 'prod-1',
         basePrice: 50000,
         markup: 300,
+        duration: {
+          productType: 'MANUAL',
+          label: '1 Bulan',
+          app: { name: 'Custom App', sellerId: 'seller-1' },
+        },
+        account: null,
+        subAccount: null,
       });
 
       prisma.order.update.mockResolvedValue({ status: 'WAITING_SELLER' });

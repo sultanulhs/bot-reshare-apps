@@ -45,13 +45,13 @@ describe('AdminSellerService', () => {
           status: 'PENDING',
           createdAt: new Date(),
           user: { email: 'test@test.com' },
-          _count: { products: 3 },
+          _count: { apps: 3 },
         },
       ]);
 
       const result = await service.listSellers();
       expect(result[0].ownerName).toBe('Seller1');
-      expect(result[0].productCount).toBe(3);
+      expect(result[0].appCount).toBe(3);
     });
   });
 
@@ -112,12 +112,16 @@ describe('AdminSellerService', () => {
         storeName: 'Toko Seller',
         phone: '081',
         status: 'PROFILE_SUBMITTED',
-        user: { email: 'test@test.com' },
+        storeCode: 'toko1',
+        phoneVerified: false,
+        createdAt: new Date(),
+        user: { email: 'test@test.com', emailVerified: true },
         profile: {
           encPayout: 'enc',
           payoutIv: 'iv',
           payoutTag: 'tag',
         },
+        _count: { apps: 2 },
       });
 
       const result = await service.getSellerDetail('s1') as any;
@@ -132,8 +136,12 @@ describe('AdminSellerService', () => {
         storeName: 'Toko Seller',
         phone: '081',
         status: 'PENDING',
-        user: { email: 'test@test.com' },
+        storeCode: null,
+        phoneVerified: false,
+        createdAt: new Date(),
+        user: { email: 'test@test.com', emailVerified: false },
         profile: null,
+        _count: { apps: 0 },
       });
 
       const result = await service.getSellerDetail('s1') as any;

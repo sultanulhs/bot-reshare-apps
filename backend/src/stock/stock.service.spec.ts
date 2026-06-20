@@ -11,8 +11,9 @@ describe('StockService', () => {
 
   beforeEach(async () => {
     prisma = {
-      product: { findFirst: jest.fn() },
-      stockUnit: { create: jest.fn(), findMany: jest.fn() },
+      duration: { findFirst: jest.fn() },
+      account: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
+      subAccount: { create: jest.fn(), findMany: jest.fn() },
     };
 
     crypto = {
@@ -34,62 +35,72 @@ describe('StockService', () => {
     service = module.get<StockService>(StockService);
   });
 
-  describe('addStock', () => {
-    it('should encrypt credentials and create stock unit', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 'prod-1', sellerId: 'seller-1' });
-      prisma.stockUnit.create.mockResolvedValue({
-        id: 'stock-1',
+  describe('addAccount', () => {
+    it('should encrypt credentials and create account', async () => {
+      prisma.duration.findFirst.mockResolvedValue({ id: 'dur-1' });
+      prisma.account.create.mockResolvedValue({
+        id: 'acc-1',
         status: 'AVAILABLE',
       });
 
-      const result = await service.addStock('seller-1', 'prod-1', {
-        credentials: 'user@example.com:password123',
+      const result = await service.addAccount('seller-1', 'dur-1', {
+        email: 'user@example.com',
+        password: 'password123',
       });
 
-      expect(crypto.encrypt).toHaveBeenCalledWith('user@example.com:password123');
-      expect(prisma.stockUnit.create).toHaveBeenCalledWith({
+      expect(crypto.encrypt).toHaveBeenCalledWith('user@example.com');
+      expect(crypto.encrypt).toHaveBeenCalledWith('password123');
+      expect(prisma.account.create).toHaveBeenCalledWith({
         data: {
-          productId: 'prod-1',
-          encCredentials: 'encrypted-cred',
-          iv: 'iv-abc',
-          authTag: 'tag-def',
+          durationId: 'dur-1',
+          encEmail: 'encrypted-cred',
+          emailIv: 'iv-abc',
+          emailTag: 'tag-def',
+          encPassword: 'encrypted-cred',
+          passwordIv: 'iv-abc',
+          passwordTag: 'tag-def',
           status: 'AVAILABLE',
         },
       });
-      expect(result).toEqual({ stockUnitId: 'stock-1', status: 'AVAILABLE' });
+      expect(result).toEqual({ accountId: 'acc-1', status: 'AVAILABLE' });
     });
 
-    it('should throw NotFoundException if product not owned by seller', async () => {
-      prisma.product.findFirst.mockResolvedValue(null);
+    it('should throw NotFoundException if duration not found for seller', async () => {
+      prisma.duration.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.addStock('seller-1', 'prod-x', { credentials: 'test' }),
+        service.addAccount('seller-1', 'dur-x', {
+          email: 'test@test.com',
+          password: 'test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('listStock', () => {
-    it('should return stock units WITHOUT credential fields', async () => {
-      prisma.stockUnit.findMany.mockResolvedValue([
+  describe('listAccounts', () => {
+    it('should return accounts WITHOUT credential fields', async () => {
+      prisma.duration.findFirst.mockResolvedValue({ id: 'dur-1' });
+      prisma.account.findMany.mockResolvedValue([
         {
-          id: 'stock-1',
-          productId: 'prod-1',
+          id: 'acc-1',
+          durationId: 'dur-1',
           status: 'AVAILABLE',
           createdAt: new Date('2026-01-01'),
+          _count: { subAccounts: 0 },
         },
       ]);
 
-      const result = await service.listStock('seller-1', {});
+      const result = await service.listAccounts('seller-1', 'dur-1');
 
       expect(result[0]).toEqual({
-        id: 'stock-1',
-        productId: 'prod-1',
+        id: 'acc-1',
+        durationId: 'dur-1',
         status: 'AVAILABLE',
         createdAt: expect.any(Date),
+        _count: { subAccounts: 0 },
       });
-      expect(result[0]).not.toHaveProperty('encCredentials');
-      expect(result[0]).not.toHaveProperty('iv');
-      expect(result[0]).not.toHaveProperty('authTag');
+      expect(result[0]).not.toHaveProperty('encEmail');
+      expect(result[0]).not.toHaveProperty('encPassword');
     });
   });
 });

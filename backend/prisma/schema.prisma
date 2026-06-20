@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -27,9 +27,10 @@ enum StockStatus {
   SOLD
 }
 
-enum StockType {
-  PRE_STOCKED
-  ON_DEMAND
+enum ProductType {
+  AKUN_READY
+  SUB_AKUN
+  MANUAL
 }
 
 enum OrderStatus {
@@ -83,24 +84,25 @@ model User {
 }
 
 model Seller {
-  id                    String                 @id @default(cuid())
-  userId                String                 @unique
-  user                  User                   @relation(fields: [userId], references: [id])
-  ownerName             String
-  storeName             String
-  phone                 String
-  phoneVerified         Boolean                @default(false)
-  tgUserId              BigInt?                @unique
-  storeCode             String?                @unique
-  status                SellerStatus           @default(PENDING)
-  products              Product[]
-  ledgerEntries         LedgerEntry[]
-  profile               SellerProfile?
-  subscriptions         Subscription[]
-  reports               Report[]
-  affiliations          BuyerAffiliation[]
-  telegramVerification  TelegramVerification?
-  createdAt             DateTime               @default(now())
+  id                   String                @id @default(cuid())
+  userId               String                @unique
+  user                 User                  @relation(fields: [userId], references: [id])
+  ownerName            String
+  storeName            String
+  phone                String
+  phoneVerified        Boolean               @default(false)
+  tgUserId             BigInt?               @unique
+  storeCode            String?               @unique
+  status               SellerStatus          @default(PENDING)
+  categories           Category[]
+  apps                 App[]
+  ledgerEntries        LedgerEntry[]
+  profile              SellerProfile?
+  subscriptions        Subscription[]
+  reports              Report[]
+  affiliations         BuyerAffiliation[]
+  telegramVerification TelegramVerification?
+  createdAt            DateTime              @default(now())
 }
 
 model Otp {
@@ -113,6 +115,7 @@ model Otp {
   expiresAt  DateTime
   consumedAt DateTime?
   createdAt  DateTime   @default(now())
+
   @@index([userId, channel])
 }
 
@@ -137,51 +140,101 @@ model SellerProfile {
   createdAt  DateTime  @default(now())
 }
 
-model Product {
-  id         String      @id @default(cuid())
-  sellerId   String
-  seller     Seller      @relation(fields: [sellerId], references: [id])
-  category   String
-  title      String
-  basePrice  Int
-  stockType  StockType   @default(PRE_STOCKED)
-  active     Boolean     @default(true)
-  stockUnits StockUnit[]
-  orders     Order[]
-  createdAt  DateTime    @default(now())
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  icon      String?
+  isDefault Boolean  @default(false)
+  sellerId  String?
+  seller    Seller?  @relation(fields: [sellerId], references: [id])
+  apps      App[]
+  createdAt DateTime @default(now())
+
+  @@unique([name, sellerId])
 }
 
-model StockUnit {
+model App {
+  id          String     @id @default(cuid())
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  sellerId    String
+  seller      Seller     @relation(fields: [sellerId], references: [id])
+  name        String
+  description String?
+  active      Boolean    @default(true)
+  durations   Duration[]
+  createdAt   DateTime   @default(now())
+}
+
+model Duration {
   id             String      @id @default(cuid())
-  productId      String
-  product        Product     @relation(fields: [productId], references: [id])
-  encCredentials String
-  iv             String
-  authTag        String
-  status         StockStatus @default(AVAILABLE)
-  order          Order?
+  appId          String
+  app            App         @relation(fields: [appId], references: [id])
+  label          String
+  days           Int
+  basePrice      Int
+  productType    ProductType @default(AKUN_READY)
+  buyerInfoLabel String?
+  active         Boolean     @default(true)
+  accounts       Account[]
+  orders         Order[]
   createdAt      DateTime    @default(now())
 }
 
+model Account {
+  id          String       @id @default(cuid())
+  durationId  String
+  duration    Duration     @relation(fields: [durationId], references: [id])
+  encEmail    String
+  emailIv     String
+  emailTag    String
+  encPassword String
+  passwordIv  String
+  passwordTag String
+  status      StockStatus  @default(AVAILABLE)
+  subAccounts SubAccount[]
+  order       Order?
+  createdAt   DateTime     @default(now())
+}
+
+model SubAccount {
+  id        String      @id @default(cuid())
+  accountId String
+  account   Account     @relation(fields: [accountId], references: [id])
+  encName   String
+  nameIv    String
+  nameTag   String
+  encPin    String
+  pinIv     String
+  pinTag    String
+  status    StockStatus @default(AVAILABLE)
+  order     Order?
+  createdAt DateTime    @default(now())
+}
+
 model Order {
-  id                    String      @id @default(cuid())
-  buyerTgUserId         BigInt
-  stockUnitId           String?     @unique
-  stockUnit             StockUnit?  @relation(fields: [stockUnitId], references: [id])
-  productId             String
-  product               Product     @relation(fields: [productId], references: [id])
-  basePrice             Int
-  markup                Int
-  totalAmount           Int
-  partnerReferenceNo    String      @unique
-  danaReferenceNo       String?
-  status                OrderStatus @default(PENDING)
-  qrContent             String?
-  expiresAt             DateTime
-  createdAt             DateTime    @default(now())
-  fulfilledAt           DateTime?
-  ledgerEntries         LedgerEntry[]
-  reports               Report[]
+  id                 String        @id @default(cuid())
+  buyerTgUserId      BigInt
+  durationId         String?
+  duration           Duration?     @relation(fields: [durationId], references: [id])
+  accountId          String?       @unique
+  account            Account?      @relation(fields: [accountId], references: [id])
+  subAccountId       String?       @unique
+  subAccount         SubAccount?   @relation(fields: [subAccountId], references: [id])
+  buyerInfo          String?
+  sellerNote         String?
+  basePrice          Int
+  markup             Int
+  totalAmount        Int
+  partnerReferenceNo String        @unique
+  danaReferenceNo    String?
+  status             OrderStatus   @default(PENDING)
+  qrContent          String?
+  expiresAt          DateTime
+  createdAt          DateTime      @default(now())
+  fulfilledAt        DateTime?
+  ledgerEntries      LedgerEntry[]
+  reports            Report[]
 }
 
 model LedgerEntry {
@@ -224,16 +277,16 @@ model SubscriptionPlan {
 }
 
 model Subscription {
-  id                    String   @id @default(cuid())
-  sellerId              String
-  seller                Seller   @relation(fields: [sellerId], references: [id])
-  planId                String
-  plan                  SubscriptionPlan @relation(fields: [planId], references: [id])
-  status                SubStatus @default(PENDING)
-  partnerReferenceNo    String    @unique
-  startedAt             DateTime?
-  expiresAt             DateTime?
-  createdAt             DateTime  @default(now())
+  id                 String           @id @default(cuid())
+  sellerId           String
+  seller             Seller           @relation(fields: [sellerId], references: [id])
+  planId             String
+  plan               SubscriptionPlan @relation(fields: [planId], references: [id])
+  status             SubStatus        @default(PENDING)
+  partnerReferenceNo String           @unique
+  startedAt          DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime         @default(now())
 }
 
 model BuyerAffiliation {

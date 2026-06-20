@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CatalogService } from './catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
 describe('CatalogService', () => {
   let service: CatalogService;
@@ -9,14 +9,19 @@ describe('CatalogService', () => {
 
   beforeEach(async () => {
     prisma = {
-      product: {
+      category: {
         findMany: jest.fn(),
         create: jest.fn(),
-        findFirst: jest.fn(),
-        update: jest.fn(),
       },
-      stockUnit: {
-        count: jest.fn(),
+      app: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      duration: {
+        findMany: jest.fn(),
+        create: jest.fn(),
       },
     };
 
@@ -30,86 +35,79 @@ describe('CatalogService', () => {
     service = module.get<CatalogService>(CatalogService);
   });
 
-  describe('listProducts', () => {
-    it('should return products with stock counts', async () => {
-      prisma.product.findMany.mockResolvedValue([
+  describe('getCategories', () => {
+    it('should return categories for seller', async () => {
+      prisma.category.findMany.mockResolvedValue([
+        { id: 'cat-1', name: 'Streaming', icon: null, isDefault: true },
+      ]);
+
+      const result = await service.getCategories('seller-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Streaming');
+    });
+  });
+
+  describe('getApps', () => {
+    it('should return apps with durations for seller', async () => {
+      prisma.app.findMany.mockResolvedValue([
         {
-          id: 'prod-1',
-          category: 'streaming',
-          title: 'Netflix',
-          basePrice: 50000,
-          active: true,
-          stockType: 'PRE_STOCKED',
-          _count: undefined,
-          stockUnits: [
-            { status: 'AVAILABLE' },
-            { status: 'AVAILABLE' },
-            { status: 'SOLD' },
+          id: 'app-1',
+          name: 'Netflix',
+          category: { id: 'cat-1', name: 'Streaming', icon: null },
+          durations: [
+            { id: 'dur-1', label: '1 Bulan', days: 30, basePrice: 50000, productType: 'AKUN_READY' },
           ],
         },
       ]);
 
-      const result = await service.listProducts('seller-1');
-      expect(result[0].stockCount).toEqual({
-        available: 2,
-        locked: 0,
-        sold: 1,
-      });
+      const result = await service.getApps('seller-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Netflix');
+      expect(result[0].durations).toHaveLength(1);
+    });
+
+    it('should filter by categoryId', async () => {
+      prisma.app.findMany.mockResolvedValue([]);
+
+      await service.getApps('seller-1', 'cat-1');
+      expect(prisma.app.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sellerId: 'seller-1', categoryId: 'cat-1' },
+        }),
+      );
     });
   });
 
-  describe('createProduct', () => {
-    it('should create a product', async () => {
-      prisma.product.create.mockResolvedValue({
-        id: 'prod-1',
-        category: 'streaming',
-        title: 'Netflix',
-        basePrice: 50000,
-        active: true,
+  describe('getAppWithStock', () => {
+    it('should return app with duration stock counts', async () => {
+      prisma.app.findUnique.mockResolvedValue({
+        id: 'app-1',
+        name: 'Netflix',
+        category: { id: 'cat-1', name: 'Streaming', icon: null },
+        durations: [
+          {
+            id: 'dur-1',
+            label: '1 Bulan',
+            days: 30,
+            basePrice: 50000,
+            productType: 'AKUN_READY',
+            buyerInfoLabel: null,
+            _count: { accounts: 3 },
+          },
+        ],
       });
 
-      const result = await service.createProduct('seller-1', {
-        category: 'streaming',
-        title: 'Netflix',
-        basePrice: 50000,
-      });
-
-      expect(result.id).toBe('prod-1');
-      expect(prisma.product.create).toHaveBeenCalledWith({
-        data: {
-          sellerId: 'seller-1',
-          category: 'streaming',
-          title: 'Netflix',
-          basePrice: 50000,
-        },
-      });
-    });
-  });
-
-  describe('updateProduct', () => {
-    it('should update product belonging to seller', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 'prod-1', sellerId: 'seller-1' });
-      prisma.product.update.mockResolvedValue({
-        id: 'prod-1',
-        title: 'Netflix Premium',
-        basePrice: 60000,
-        active: true,
-      });
-
-      const result = await service.updateProduct('seller-1', 'prod-1', {
-        title: 'Netflix Premium',
-        basePrice: 60000,
-      });
-
-      expect(result.title).toBe('Netflix Premium');
+      const result = await service.getAppWithStock('app-1');
+      expect(result.name).toBe('Netflix');
+      expect(result.durations[0].availableStock).toBe(3);
     });
 
-    it('should throw NotFoundException if product not found or not owned', async () => {
-      prisma.product.findFirst.mockResolvedValue(null);
+    it('should throw NotFoundException if app not found', async () => {
+      prisma.app.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.updateProduct('seller-1', 'prod-x', { title: 'X' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getAppWithStock('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

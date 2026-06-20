@@ -22,7 +22,7 @@ export class AdminSellerService {
       where,
       include: {
         user: { select: { email: true } },
-        _count: { select: { products: true } },
+        _count: { select: { apps: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -34,7 +34,7 @@ export class AdminSellerService {
       email: s.user.email,
       phone: s.phone,
       status: s.status,
-      productCount: s._count.products,
+      appCount: s._count.apps,
       createdAt: s.createdAt,
     }));
   }
@@ -45,7 +45,7 @@ export class AdminSellerService {
       include: {
         user: { select: { email: true, emailVerified: true } },
         profile: true,
-        _count: { select: { products: true } },
+        _count: { select: { apps: true } },
       },
     });
 
@@ -63,7 +63,7 @@ export class AdminSellerService {
       storeCode: seller.storeCode,
       emailVerified: seller.user.emailVerified,
       phoneVerified: seller.phoneVerified,
-      productCount: seller._count.products,
+      appCount: seller._count.apps,
       createdAt: seller.createdAt,
     };
 

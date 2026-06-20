@@ -17,8 +17,9 @@ import { TelegramService } from '../telegram/telegram.service';
 
 interface CreateOrderParams {
   buyerTgUserId: bigint;
-  productId: string;
+  durationId: string;
   sellerId: string;
+  buyerInfo?: string;
 }
 
 @Injectable()
@@ -38,28 +39,54 @@ export class OrderService {
   ) {}
 
   async createOrder(params: CreateOrderParams) {
-    const product = await this.prisma.product.findFirst({
-      where: { id: params.productId, sellerId: params.sellerId, active: true },
+    const duration = await this.prisma.duration.findFirst({
+      where: { id: params.durationId, active: true, app: { sellerId: params.sellerId, active: true } },
+      include: { app: true },
     });
-    if (!product) {
-      throw new BadRequestException('Product not available');
-    }
-
-    const stockUnit = await this.prisma.stockUnit.findFirst({
-      where: { productId: product.id, status: 'AVAILABLE' },
-    });
-    if (!stockUnit) {
-      throw new BadRequestException('No stock available');
+    if (!duration) {
+      throw new BadRequestException('Duration not available');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.stockUnit.update({
-        where: { id: stockUnit.id },
-        data: { status: 'LOCKED' },
-      });
+      let accountId: string | undefined;
+      let subAccountId: string | undefined;
+
+      if (duration.productType === 'AKUN_READY') {
+        const account = await tx.account.findFirst({
+          where: { durationId: duration.id, status: 'AVAILABLE' },
+        });
+        if (!account) {
+          throw new BadRequestException('No stock available');
+        }
+        await tx.account.update({
+          where: { id: account.id },
+          data: { status: 'LOCKED' },
+        });
+        // Lock all sub-accounts too
+        await tx.subAccount.updateMany({
+          where: { accountId: account.id },
+          data: { status: 'LOCKED' },
+        });
+        accountId = account.id;
+      } else if (duration.productType === 'SUB_AKUN') {
+        const subAccount = await tx.subAccount.findFirst({
+          where: { status: 'AVAILABLE', account: { durationId: duration.id } },
+          include: { account: true },
+        });
+        if (!subAccount) {
+          throw new BadRequestException('No sub-account available');
+        }
+        await tx.subAccount.update({
+          where: { id: subAccount.id },
+          data: { status: 'LOCKED' },
+        });
+        subAccountId = subAccount.id;
+        accountId = subAccount.accountId;
+      }
+      // MANUAL: no account needed
 
       const markup = await this.markupService.computeMarkup();
-      const totalAmount = product.basePrice + markup;
+      const totalAmount = duration.basePrice + markup;
       const partnerReferenceNo = `ORD_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const ttl = this.config.get<number>('ORDER_TTL_MINUTES') ?? 15;
       const expiresAt = new Date(Date.now() + ttl * 60 * 1000);
@@ -67,15 +94,17 @@ export class OrderService {
       const danaResult = await this.danaService.createQrisOrder({
         partnerReferenceNo,
         amount: totalAmount,
-        title: product.title,
+        title: duration.app.name,
       });
 
       const order = await tx.order.create({
         data: {
           buyerTgUserId: params.buyerTgUserId,
-          stockUnitId: stockUnit.id,
-          productId: product.id,
-          basePrice: product.basePrice,
+          durationId: duration.id,
+          accountId: accountId ?? null,
+          subAccountId: subAccountId ?? null,
+          buyerInfo: params.buyerInfo ?? null,
+          basePrice: duration.basePrice,
           markup,
           totalAmount,
           partnerReferenceNo,
@@ -121,9 +150,21 @@ export class OrderService {
         data: { status: 'EXPIRED' },
       });
 
-      if (order.stockUnitId) {
-        await tx.stockUnit.update({
-          where: { id: order.stockUnitId },
+      if (order.accountId) {
+        await tx.account.update({
+          where: { id: order.accountId },
+          data: { status: 'AVAILABLE' },
+        });
+        // Release sub-accounts too
+        await tx.subAccount.updateMany({
+          where: { accountId: order.accountId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      if (order.subAccountId) {
+        await tx.subAccount.update({
+          where: { id: order.subAccountId },
           data: { status: 'AVAILABLE' },
         });
       }
@@ -134,10 +175,12 @@ export class OrderService {
     return this.prisma.order.findMany({
       where: {
         status: 'WAITING_SELLER',
-        product: { sellerId },
+        duration: { app: { sellerId } },
       },
       include: {
-        product: { select: { title: true } },
+        duration: {
+          include: { app: { select: { name: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -150,35 +193,26 @@ export class OrderService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { product: true },
+      include: { duration: { include: { app: true } } },
     });
 
     if (!order || order.status !== 'WAITING_SELLER') {
       throw new BadRequestException('Order not in WAITING_SELLER status');
     }
-    if (order.product.sellerId !== sellerId) {
+    if (!order.duration) {
+      throw new BadRequestException('Order has no duration linked');
+    }
+    if (order.duration.app.sellerId !== sellerId) {
       throw new BadRequestException('Order does not belong to this seller');
     }
 
-    const encrypted = this.cryptoService.encrypt(credentials);
-
     await this.prisma.$transaction(async (tx) => {
-      const stockUnit = await tx.stockUnit.create({
-        data: {
-          productId: order.productId,
-          encCredentials: encrypted.ciphertext,
-          iv: encrypted.iv,
-          authTag: encrypted.authTag,
-          status: 'SOLD',
-        },
-      });
-
       await tx.order.update({
         where: { id: orderId },
         data: {
           status: 'FULFILLED',
           fulfilledAt: new Date(),
-          stockUnitId: stockUnit.id,
+          sellerNote: credentials,
         },
       });
 
@@ -203,7 +237,7 @@ export class OrderService {
     try {
       await this.telegramService.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
-        `✅ Kredensial sudah siap!\n\n📦 ${order.product.title}\n🔑 ${credentials}\n\nSimpan dengan aman.`,
+        `✅ Kredensial sudah siap!\n\n📦 ${order.duration!.app.name} (${order.duration!.label})\n🔑 ${credentials}\n\nSimpan dengan aman.`,
       );
     } catch (err: any) {
       this.logger.warn(

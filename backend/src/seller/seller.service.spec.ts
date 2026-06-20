@@ -86,10 +86,14 @@ describe('SellerService', () => {
       prisma.seller.update.mockResolvedValue({ status: 'PROFILE_SUBMITTED' });
 
       const result = await service.submitProfile('user-1', {
-        payoutAccount: 'BCA 1234567890',
+        bankName: 'BCA',
+        accountNumber: '1234567890',
+        accountHolder: 'Test User',
       });
 
-      expect(crypto.encrypt).toHaveBeenCalledWith('BCA 1234567890');
+      expect(crypto.encrypt).toHaveBeenCalledWith(
+        JSON.stringify({ bankName: 'BCA', accountNumber: '1234567890', accountHolder: 'Test User' }),
+      );
       expect(prisma.sellerProfile.create).toHaveBeenCalledWith({
         data: {
           sellerId: 'seller-1',
@@ -108,7 +112,7 @@ describe('SellerService', () => {
       });
 
       await expect(
-        service.submitProfile('user-1', { payoutAccount: 'BCA 123' }),
+        service.submitProfile('user-1', { bankName: 'BCA', accountNumber: '123', accountHolder: 'Test' }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -116,7 +120,7 @@ describe('SellerService', () => {
       prisma.seller.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.submitProfile('no-user', { payoutAccount: 'BCA 123' }),
+        service.submitProfile('no-user', { bankName: 'BCA', accountNumber: '123', accountHolder: 'Test' }),
       ).rejects.toThrow(NotFoundException);
     });
   });

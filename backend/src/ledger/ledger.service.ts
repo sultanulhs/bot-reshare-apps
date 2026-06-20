@@ -29,12 +29,10 @@ export class LedgerService {
       where: { sellerId, type: 'SELLER_CREDIT' },
       include: {
         order: {
-          select: { fulfilledAt: true },
-          include: {
-            stockUnit: {
-              select: {
-                product: { select: { title: true } },
-              },
+          select: {
+            fulfilledAt: true,
+            duration: {
+              select: { label: true, app: { select: { name: true } } },
             },
           },
         },
@@ -44,7 +42,7 @@ export class LedgerService {
 
     return entries.map((e) => ({
       orderId: e.orderId,
-      productTitle: e.order?.stockUnit?.product?.title ?? 'Unknown',
+      productTitle: e.order?.duration?.app?.name ?? 'Unknown',
       amount: e.amount,
       soldAt: e.order?.fulfilledAt ?? e.createdAt,
     }));

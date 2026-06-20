@@ -5,14 +5,15 @@ import { CryptoService } from '../crypto/crypto.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 
-describe('FulfilmentService — Idempotency', () => {
+describe('FulfilmentService -- Idempotency', () => {
   let service: FulfilmentService;
   let prisma: any;
 
   beforeEach(async () => {
     prisma = {
       order: { findUnique: jest.fn(), update: jest.fn() },
-      stockUnit: { findUnique: jest.fn(), update: jest.fn() },
+      account: { update: jest.fn() },
+      subAccount: { updateMany: jest.fn() },
       ledgerEntry: { create: jest.fn() },
       $transaction: jest.fn((fn: any) => fn(prisma)),
     };
@@ -45,23 +46,35 @@ describe('FulfilmentService — Idempotency', () => {
         id: 'o1',
         status: 'PENDING',
         buyerTgUserId: BigInt(1),
-        stockUnitId: 's1',
-        productId: 'p1',
         basePrice: 1000,
         markup: 100,
+        duration: {
+          productType: 'AKUN_READY',
+          label: '1 Bulan',
+          app: { name: 'Test', sellerId: 'sel1' },
+        },
+        account: {
+          id: 'acc-1',
+          encEmail: 'e',
+          emailIv: 'i',
+          emailTag: 't',
+          encPassword: 'e',
+          passwordIv: 'i',
+          passwordTag: 't',
+          subAccounts: [],
+        },
+        subAccount: null,
       })
       .mockResolvedValueOnce({
         id: 'o1',
         status: 'FULFILLED',
+        duration: { productType: 'AKUN_READY', app: { sellerId: 'sel1' } },
+        account: null,
+        subAccount: null,
       });
 
-    prisma.stockUnit.findUnique.mockResolvedValue({
-      id: 's1',
-      encCredentials: 'e',
-      iv: 'i',
-      authTag: 't',
-      product: { title: 'Test', stockType: 'PRE_STOCKED', sellerId: 'sel1' },
-    });
+    prisma.order.update.mockResolvedValue({ status: 'FULFILLED' });
+    prisma.account.update.mockResolvedValue({});
 
     await service.handlePaymentNotification({ originalPartnerReferenceNo: 'ORD_1' });
     await service.handlePaymentNotification({ originalPartnerReferenceNo: 'ORD_1' });
@@ -77,20 +90,35 @@ describe('FulfilmentService — Idempotency', () => {
         id: 'o1',
         status: 'PENDING',
         buyerTgUserId: BigInt(1),
-        stockUnitId: 's1',
-        productId: 'p1',
         basePrice: 1000,
         markup: 100,
+        duration: {
+          productType: 'AKUN_READY',
+          label: '1 Bulan',
+          app: { name: 'Test', sellerId: 'sel1' },
+        },
+        account: {
+          id: 'acc-1',
+          encEmail: 'e',
+          emailIv: 'i',
+          emailTag: 't',
+          encPassword: 'e',
+          passwordIv: 'i',
+          passwordTag: 't',
+          subAccounts: [],
+        },
+        subAccount: null,
       })
-      .mockResolvedValueOnce({ id: 'o1', status: 'FULFILLED' });
+      .mockResolvedValueOnce({
+        id: 'o1',
+        status: 'FULFILLED',
+        duration: { productType: 'AKUN_READY', app: { sellerId: 'sel1' } },
+        account: null,
+        subAccount: null,
+      });
 
-    prisma.stockUnit.findUnique.mockResolvedValue({
-      id: 's1',
-      encCredentials: 'e',
-      iv: 'i',
-      authTag: 't',
-      product: { title: 'Test', stockType: 'PRE_STOCKED', sellerId: 'sel1' },
-    });
+    prisma.order.update.mockResolvedValue({ status: 'FULFILLED' });
+    prisma.account.update.mockResolvedValue({});
 
     const module = await Test.createTestingModule({
       providers: [

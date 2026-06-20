@@ -28,6 +28,11 @@ export class FulfilmentService {
 
     const order = await this.prisma.order.findUnique({
       where: { partnerReferenceNo: refNo },
+      include: {
+        duration: { include: { app: true } },
+        account: { include: { subAccounts: true } },
+        subAccount: true,
+      },
     });
 
     if (!order) {
@@ -40,27 +45,46 @@ export class FulfilmentService {
       return;
     }
 
-    if (order.stockUnitId) {
-      const stockUnit = await this.prisma.stockUnit.findUnique({
-        where: { id: order.stockUnitId },
-        include: { product: { select: { title: true, stockType: true, sellerId: true } } },
-      });
+    if (!order.duration) {
+      this.logger.error(`Order ${order.id} has no duration linked`);
+      return;
+    }
 
-      if (stockUnit && stockUnit.product.stockType === 'PRE_STOCKED') {
-        await this.fulfilPreStocked(order, stockUnit);
-        return;
+    const productType = order.duration.productType;
+
+    if (productType === 'AKUN_READY') {
+      await this.fulfilAkunReady(order);
+    } else if (productType === 'SUB_AKUN') {
+      await this.fulfilSubAkun(order);
+    } else {
+      // MANUAL
+      await this.setWaitingSeller(order);
+    }
+  }
+
+  private async fulfilAkunReady(order: any) {
+    const account = order.account;
+    if (!account) {
+      this.logger.error(`No account linked for AKUN_READY order ${order.id}`);
+      await this.setWaitingSeller(order);
+      return;
+    }
+
+    const email = this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
+    const password = this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
+
+    let credentialText = `📧 Email: ${email}\n🔑 Password: ${password}`;
+
+    // Include sub-accounts if any
+    if (account.subAccounts && account.subAccounts.length > 0) {
+      for (const sub of account.subAccounts) {
+        const name = this.crypto.decrypt(sub.encName, sub.nameIv, sub.nameTag);
+        const pin = this.crypto.decrypt(sub.encPin, sub.pinIv, sub.pinTag);
+        credentialText += `\n\n👤 Profil: ${name}\n🔐 PIN: ${pin}`;
       }
     }
 
-    await this.setWaitingSeller(order);
-  }
-
-  private async fulfilPreStocked(order: any, stockUnit: any) {
-    const credentials = this.crypto.decrypt(
-      stockUnit.encCredentials,
-      stockUnit.iv,
-      stockUnit.authTag,
-    );
+    const sellerId = order.duration.app.sellerId;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
@@ -68,14 +92,21 @@ export class FulfilmentService {
         data: { status: 'FULFILLED', fulfilledAt: new Date() },
       });
 
-      await tx.stockUnit.update({
-        where: { id: stockUnit.id },
+      await tx.account.update({
+        where: { id: account.id },
         data: { status: 'SOLD' },
       });
 
+      if (account.subAccounts && account.subAccounts.length > 0) {
+        await tx.subAccount.updateMany({
+          where: { accountId: account.id },
+          data: { status: 'SOLD' },
+        });
+      }
+
       await tx.ledgerEntry.create({
         data: {
-          sellerId: stockUnit.product?.sellerId ?? null,
+          sellerId,
           orderId: order.id,
           type: 'SELLER_CREDIT',
           amount: order.basePrice,
@@ -95,15 +126,77 @@ export class FulfilmentService {
       await this.telegram.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
         `✅ Pembayaran berhasil!\n\n` +
-          `📦 Produk: ${stockUnit.product.title}\n` +
-          `🔑 Kredensial:\n${credentials}\n\n` +
+          `📦 ${order.duration.app.name} (${order.duration.label})\n` +
+          `${credentialText}\n\n` +
           `Simpan dengan aman. Gunakan /report jika ada masalah.`,
       );
     } catch (err: any) {
       this.logger.error(`Failed to send credentials to buyer: ${err.message}`);
     }
 
-    this.logger.log(`Order ${order.id} fulfilled (PRE_STOCKED)`);
+    this.logger.log(`Order ${order.id} fulfilled (AKUN_READY)`);
+  }
+
+  private async fulfilSubAkun(order: any) {
+    const account = order.account;
+    const subAccount = order.subAccount;
+
+    if (!account || !subAccount) {
+      this.logger.error(`Missing account/subAccount for SUB_AKUN order ${order.id}`);
+      await this.setWaitingSeller(order);
+      return;
+    }
+
+    const email = this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
+    const password = this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
+    const name = this.crypto.decrypt(subAccount.encName, subAccount.nameIv, subAccount.nameTag);
+    const pin = this.crypto.decrypt(subAccount.encPin, subAccount.pinIv, subAccount.pinTag);
+
+    const sellerId = order.duration.app.sellerId;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: 'FULFILLED', fulfilledAt: new Date() },
+      });
+
+      await tx.subAccount.update({
+        where: { id: subAccount.id },
+        data: { status: 'SOLD' },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          sellerId,
+          orderId: order.id,
+          type: 'SELLER_CREDIT',
+          amount: order.basePrice,
+        },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          orderId: order.id,
+          type: 'OPERATOR_MARKUP',
+          amount: order.markup,
+        },
+      });
+    });
+
+    try {
+      await this.telegram.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        `✅ Pembayaran berhasil!\n\n` +
+          `📦 ${order.duration.app.name} (${order.duration.label})\n` +
+          `📧 Email: ${email}\n🔑 Password: ${password}\n` +
+          `👤 Profil: ${name}\n🔐 PIN: ${pin}\n\n` +
+          `Simpan dengan aman. Gunakan /report jika ada masalah.`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to send credentials to buyer: ${err.message}`);
+    }
+
+    this.logger.log(`Order ${order.id} fulfilled (SUB_AKUN)`);
   }
 
   private async setWaitingSeller(order: any) {

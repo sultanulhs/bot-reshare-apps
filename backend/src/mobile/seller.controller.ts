@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
   Post,
   Query,
   Req,
@@ -20,9 +19,11 @@ import { StockService } from '../stock/stock.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { SubmitProfileDto } from '../seller/dto/submit-profile.dto';
 import { SetStoreCodeDto } from '../seller/dto/set-store-code.dto';
-import { CreateProductDto } from '../catalog/dto/create-product.dto';
-import { UpdateProductDto } from '../catalog/dto/update-product.dto';
-import { AddStockDto } from '../stock/dto/add-stock.dto';
+import { CreateCategoryDto } from '../catalog/dto/create-category.dto';
+import { CreateAppDto } from '../catalog/dto/create-app.dto';
+import { CreateDurationDto } from '../catalog/dto/create-duration.dto';
+import { AddAccountDto } from '../stock/dto/add-account.dto';
+import { AddSubAccountDto } from '../stock/dto/add-sub-account.dto';
 import { OrderService } from '../order/order.service';
 import { FulfilOrderDto } from '../order/dto/fulfil-order.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -63,43 +64,88 @@ export class SellerController {
     return this.sellerService.submitProfile(req.user.sub, dto);
   }
 
-  @Get('products')
-  async listProducts(@Req() req: any) {
+  // --- Category endpoints ---
+
+  @Get('categories')
+  async getCategories(@Req() req: any) {
     const seller = await this.sellerService.getStatus(req.user.sub);
-    return this.catalogService.listProducts(seller.id);
+    return this.catalogService.getCategories(seller.id);
   }
 
-  @Post('products')
+  @Post('categories')
   @UseGuards(ActiveSellerGuard)
-  async createProduct(@Req() req: any, @Body() dto: CreateProductDto) {
-    return this.catalogService.createProduct(req.seller.id, dto);
+  async createCategory(@Req() req: any, @Body() dto: CreateCategoryDto) {
+    return this.catalogService.createCategory(req.seller.id, dto);
   }
 
-  @Patch('products/:id')
-  async updateProduct(
+  // --- App endpoints ---
+
+  @Get('apps')
+  async getApps(@Req() req: any, @Query('categoryId') categoryId?: string) {
+    const seller = await this.sellerService.getStatus(req.user.sub);
+    return this.catalogService.getApps(seller.id, categoryId);
+  }
+
+  @Post('apps')
+  @UseGuards(ActiveSellerGuard)
+  async createApp(@Req() req: any, @Body() dto: CreateAppDto) {
+    return this.catalogService.createApp(req.seller.id, dto);
+  }
+
+  @Get('apps/:id')
+  async getAppDetail(@Req() req: any, @Param('id') id: string) {
+    return this.catalogService.getAppWithStock(id);
+  }
+
+  // --- Duration endpoints ---
+
+  @Post('apps/:appId/durations')
+  @UseGuards(ActiveSellerGuard)
+  async createDuration(
     @Req() req: any,
-    @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Param('appId') appId: string,
+    @Body() dto: CreateDurationDto,
+  ) {
+    return this.catalogService.createDuration(req.seller.id, appId, dto);
+  }
+
+  // --- Account/Stock endpoints ---
+
+  @Post('durations/:durationId/accounts')
+  @UseGuards(ActiveSellerGuard)
+  addAccount(
+    @Req() req: any,
+    @Param('durationId') durationId: string,
+    @Body() dto: AddAccountDto,
+  ) {
+    return this.stockService.addAccount(req.seller.id, durationId, dto);
+  }
+
+  @Get('durations/:durationId/accounts')
+  async listAccounts(
+    @Req() req: any,
+    @Param('durationId') durationId: string,
   ) {
     const seller = await this.sellerService.getStatus(req.user.sub);
-    return this.catalogService.updateProduct(seller.id, id, dto);
+    return this.stockService.listAccounts(seller.id, durationId);
   }
 
-  @Post('products/:id/stock')
+  @Post('accounts/:accountId/sub-accounts')
   @UseGuards(ActiveSellerGuard)
-  addStock(@Req() req: any, @Param('id') id: string, @Body() dto: AddStockDto) {
-    return this.stockService.addStock(req.seller.id, id, dto);
+  addSubAccount(
+    @Req() req: any,
+    @Param('accountId') accountId: string,
+    @Body() dto: AddSubAccountDto,
+  ) {
+    return this.stockService.addSubAccount(req.seller.id, accountId, dto);
   }
 
-  @Get('stock')
-  async listStock(
-    @Req() req: any,
-    @Query('productId') productId?: string,
-    @Query('status') status?: string,
-  ) {
-    const seller = await this.sellerService.getStatus(req.user.sub);
-    return this.stockService.listStock(seller.id, { productId, status });
+  @Get('accounts/:accountId/sub-accounts')
+  async listSubAccounts(@Param('accountId') accountId: string) {
+    return this.stockService.listSubAccounts(accountId);
   }
+
+  // --- Balance/Sales ---
 
   @Get('balance')
   async getBalance(@Req() req: any) {
@@ -113,9 +159,11 @@ export class SellerController {
     return this.ledgerService.getSales(seller.id);
   }
 
-  @Get('pending-fulfillments')
+  // --- Order fulfillment ---
+
+  @Get('pending-orders')
   @UseGuards(ActiveSellerGuard)
-  getPendingFulfillments(@Req() req: any) {
+  getPendingOrders(@Req() req: any) {
     return this.orderService.getSellerPendingFulfillments(req.seller.id);
   }
 
@@ -128,6 +176,8 @@ export class SellerController {
   ) {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
   }
+
+  // --- Verification ---
 
   @Post('verify/email/send')
   async sendEmailOtp(@Req() req: any) {

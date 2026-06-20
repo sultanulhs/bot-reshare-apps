@@ -23,8 +23,9 @@ describe('OrderService', () => {
   beforeEach(async () => {
     expiryQueue = { add: jest.fn() };
     prisma = {
-      product: { findFirst: jest.fn() },
-      stockUnit: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
+      duration: { findFirst: jest.fn() },
+      account: { findFirst: jest.fn(), update: jest.fn() },
+      subAccount: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       order: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -77,15 +78,17 @@ describe('OrderService', () => {
   });
 
   describe('createOrder', () => {
-    it('should lock stock, compute markup, create DANA order, and save', async () => {
-      prisma.product.findFirst.mockResolvedValue({
-        id: 'prod-1',
+    it('should lock account, compute markup, create DANA order, and save', async () => {
+      prisma.duration.findFirst.mockResolvedValue({
+        id: 'dur-1',
         basePrice: 50000,
         active: true,
-        stockType: 'PRE_STOCKED',
+        productType: 'AKUN_READY',
+        app: { name: 'Netflix', sellerId: 'seller-1' },
       });
-      prisma.stockUnit.findFirst.mockResolvedValue({ id: 'stock-1' });
-      prisma.stockUnit.update.mockResolvedValue({ id: 'stock-1', status: 'LOCKED' });
+      prisma.account.findFirst.mockResolvedValue({ id: 'acc-1' });
+      prisma.account.update.mockResolvedValue({ id: 'acc-1', status: 'LOCKED' });
+      prisma.subAccount.updateMany.mockResolvedValue({ count: 0 });
       prisma.order.create.mockResolvedValue({
         id: 'order-1',
         totalAmount: 50300,
@@ -96,14 +99,14 @@ describe('OrderService', () => {
 
       const result = await service.createOrder({
         buyerTgUserId: BigInt(12345),
-        productId: 'prod-1',
+        durationId: 'dur-1',
         sellerId: 'seller-1',
       });
 
       expect(result.totalAmount).toBe(50300);
       expect(markup.computeMarkup).toHaveBeenCalled();
       expect(dana.createQrisOrder).toHaveBeenCalled();
-      expect(prisma.stockUnit.update).toHaveBeenCalledWith(
+      expect(prisma.account.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { status: 'LOCKED' },
         }),
@@ -111,29 +114,31 @@ describe('OrderService', () => {
     });
 
     it('should throw if no available stock', async () => {
-      prisma.product.findFirst.mockResolvedValue({
-        id: 'prod-1',
+      prisma.duration.findFirst.mockResolvedValue({
+        id: 'dur-1',
         basePrice: 50000,
         active: true,
+        productType: 'AKUN_READY',
+        app: { name: 'Netflix', sellerId: 'seller-1' },
       });
-      prisma.stockUnit.findFirst.mockResolvedValue(null);
+      prisma.account.findFirst.mockResolvedValue(null);
 
       await expect(
         service.createOrder({
           buyerTgUserId: BigInt(12345),
-          productId: 'prod-1',
+          durationId: 'dur-1',
           sellerId: 'seller-1',
         }),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw if product not found', async () => {
-      prisma.product.findFirst.mockResolvedValue(null);
+    it('should throw if duration not found', async () => {
+      prisma.duration.findFirst.mockResolvedValue(null);
 
       await expect(
         service.createOrder({
           buyerTgUserId: BigInt(12345),
-          productId: 'nonexistent',
+          durationId: 'nonexistent',
           sellerId: 'seller-1',
         }),
       ).rejects.toThrow(BadRequestException);
@@ -141,14 +146,16 @@ describe('OrderService', () => {
   });
 
   describe('expireOrder', () => {
-    it('should set order EXPIRED and release stock to AVAILABLE', async () => {
+    it('should set order EXPIRED and release account to AVAILABLE', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'order-1',
         status: 'PENDING',
-        stockUnitId: 'stock-1',
+        accountId: 'acc-1',
+        subAccountId: null,
       });
       prisma.order.update.mockResolvedValue({ status: 'EXPIRED' });
-      prisma.stockUnit.update.mockResolvedValue({ status: 'AVAILABLE' });
+      prisma.account.update.mockResolvedValue({ status: 'AVAILABLE' });
+      prisma.subAccount.updateMany.mockResolvedValue({ count: 0 });
 
       await service.expireOrder('order-1');
 
@@ -157,7 +164,7 @@ describe('OrderService', () => {
           data: { status: 'EXPIRED' },
         }),
       );
-      expect(prisma.stockUnit.update).toHaveBeenCalledWith(
+      expect(prisma.account.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { status: 'AVAILABLE' },
         }),

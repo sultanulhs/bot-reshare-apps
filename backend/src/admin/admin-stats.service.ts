@@ -70,8 +70,8 @@ export class AdminStatsService {
       this.prisma.order.findMany({
         where,
         include: {
-          stockUnit: {
-            select: { product: { select: { title: true } } },
+          duration: {
+            select: { label: true, app: { select: { name: true } } },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -84,7 +84,7 @@ export class AdminStatsService {
     return {
       items: items.map((o) => ({
         id: o.id,
-        productTitle: o.stockUnit?.product?.title ?? 'Unknown',
+        productTitle: o.duration?.app?.name ?? 'Unknown',
         totalAmount: o.totalAmount,
         status: o.status,
         createdAt: o.createdAt,

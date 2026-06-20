@@ -45,7 +45,7 @@ export function createBuyerComposer(
 
     if (affiliation?.seller) {
       const keyboard = new InlineKeyboard()
-        .text('\u{1F4CB} Lihat Katalog', 'catalog')
+        .text('\u{1F4CB} Lihat Kategori', 'catalog')
         .row()
         .text('\u{1F4E6} Pesanan Saya', 'myorders');
 
@@ -60,6 +60,7 @@ export function createBuyerComposer(
     }
   });
 
+  // catalog → list categories
   composer.callbackQuery('catalog', async (ctx) => {
     await ctx.answerCallbackQuery();
     const tgUserId = BigInt(ctx.from.id);
@@ -73,33 +74,30 @@ export function createBuyerComposer(
       return;
     }
 
-    const products = await catalogService.listProducts(affiliation.sellerId);
-    const available = products.filter((p) => p.active && p.stockCount.available > 0);
+    const categories = await catalogService.getCategories(affiliation.sellerId);
 
-    if (available.length === 0) {
-      await ctx.reply('\u{1F614} Tidak ada produk tersedia saat ini.');
+    if (categories.length === 0) {
+      await ctx.reply('\u{1F614} Tidak ada kategori tersedia saat ini.');
       return;
     }
 
     const keyboard = new InlineKeyboard();
-    for (const product of available) {
+    for (const cat of categories) {
       keyboard
-        .text(
-          `${product.title} - Rp${product.basePrice.toLocaleString('id-ID')} (${product.stockCount.available} tersedia)`,
-          `buy_${product.id}`,
-        )
+        .text(`${cat.icon ?? ''} ${cat.name}`.trim(), `cat_${cat.id}`)
         .row();
     }
 
-    await ctx.reply('\u{1F4CB} *Katalog Produk*\n\nPilih produk untuk membeli:', {
+    await ctx.reply('\u{1F4CB} *Kategori*\n\nPilih kategori:', {
       reply_markup: keyboard,
       parse_mode: 'Markdown',
     });
   });
 
-  composer.callbackQuery(/^buy_(.+)$/, async (ctx) => {
+  // cat_<categoryId> → list apps in category
+  composer.callbackQuery(/^cat_(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    const productId = ctx.match![1];
+    const categoryId = ctx.match![1];
     const tgUserId = BigInt(ctx.from.id);
 
     const affiliation = await prisma.buyerAffiliation.findUnique({
@@ -111,32 +109,90 @@ export function createBuyerComposer(
       return;
     }
 
-    const products = await catalogService.listProducts(affiliation.sellerId);
-    const product = products.find((p) => p.id === productId);
+    const apps = await catalogService.getApps(affiliation.sellerId, categoryId);
 
-    if (!product || !product.active || product.stockCount.available === 0) {
-      await ctx.reply('❌ Produk tidak tersedia.');
+    if (apps.length === 0) {
+      await ctx.reply('\u{1F614} Tidak ada aplikasi tersedia di kategori ini.');
+      return;
+    }
+
+    const keyboard = new InlineKeyboard();
+    for (const app of apps) {
+      keyboard.text(app.name, `app_${app.id}`).row();
+    }
+    keyboard.text('\u{2B05}️ Kembali', 'catalog').row();
+
+    await ctx.reply('\u{1F4F1} *Pilih Aplikasi*\n\nPilih aplikasi yang ingin dibeli:', {
+      reply_markup: keyboard,
+      parse_mode: 'Markdown',
+    });
+  });
+
+  // app_<appId> → list durations with prices
+  composer.callbackQuery(/^app_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const appId = ctx.match![1];
+
+    const appWithStock = await catalogService.getAppWithStock(appId);
+
+    if (!appWithStock || appWithStock.durations.length === 0) {
+      await ctx.reply('❌ Tidak ada paket tersedia untuk aplikasi ini.');
+      return;
+    }
+
+    const keyboard = new InlineKeyboard();
+    for (const dur of appWithStock.durations) {
+      keyboard
+        .text(
+          `${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}`,
+          `buy_${dur.id}`,
+        )
+        .row();
+    }
+    if (appWithStock.category) {
+      keyboard.text('\u{2B05}️ Kembali', `cat_${appWithStock.category.id}`).row();
+    }
+
+    await ctx.reply(
+      `\u{1F4F1} *${appWithStock.name}*\n\nPilih durasi langganan:`,
+      { reply_markup: keyboard, parse_mode: 'Markdown' },
+    );
+  });
+
+  // buy_<durationId> → show detail + confirm button
+  composer.callbackQuery(/^buy_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const durationId = ctx.match![1];
+
+    const duration = await prisma.duration.findUnique({
+      where: { id: durationId },
+      include: { app: true },
+    });
+
+    if (!duration || !duration.active) {
+      await ctx.reply('❌ Paket tidak tersedia.');
       return;
     }
 
     const keyboard = new InlineKeyboard()
-      .text('✅ Konfirmasi Beli', `confirm_${productId}`)
-      .text('❌ Batal', 'catalog');
+      .text('✅ Konfirmasi Beli', `confirm_${durationId}`)
+      .text('❌ Batal', `app_${duration.appId}`);
 
     await ctx.reply(
-      `\u{1F6D2} *Detail Produk*\n\n` +
-        `\u{1F4E6} ${product.title}\n` +
-        `\u{1F4B0} Harga: Rp${product.basePrice.toLocaleString('id-ID')}\n` +
-        `\u{1F4C1} Kategori: ${product.category}\n\n` +
+      `\u{1F6D2} *Detail Paket*\n\n` +
+        `\u{1F4F1} ${duration.app.name}\n` +
+        `\u{23F3} Durasi: ${duration.label}\n` +
+        `\u{1F4B0} Harga: Rp${duration.basePrice.toLocaleString('id-ID')}\n\n` +
         `_Harga final akan ditampilkan saat pembayaran._\n\n` +
         `Konfirmasi pembelian?`,
       { reply_markup: keyboard, parse_mode: 'Markdown' },
     );
   });
 
+  // confirm_<durationId> → create order
   composer.callbackQuery(/^confirm_(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    const productId = ctx.match![1];
+    const durationId = ctx.match![1];
     const tgUserId = BigInt(ctx.from.id);
 
     const affiliation = await prisma.buyerAffiliation.findUnique({
@@ -151,7 +207,7 @@ export function createBuyerComposer(
     try {
       const order = await orderService.createOrder({
         buyerTgUserId: tgUserId,
-        productId,
+        durationId,
         sellerId: affiliation.sellerId,
       });
 
@@ -159,7 +215,7 @@ export function createBuyerComposer(
         new InputFile(order.qrImage, 'qris.png'),
         {
           caption:
-            `💳 *Pembayaran QRIS*\n\n` +
+            `\u{1F4B3} *Pembayaran QRIS*\n\n` +
             `Total: Rp${order.totalAmount.toLocaleString('id-ID')}\n` +
             `Berlaku sampai: ${order.expiresAt.toLocaleString('id-ID')}\n\n` +
             `Scan QR di atas untuk membayar via DANA.\n` +
@@ -179,8 +235,8 @@ export function createBuyerComposer(
     const orders = await prisma.order.findMany({
       where: { buyerTgUserId: tgUserId },
       include: {
-        stockUnit: {
-          select: { product: { select: { title: true } } },
+        duration: {
+          select: { label: true, app: { select: { name: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -203,8 +259,9 @@ export function createBuyerComposer(
 
     const lines = orders.map((o) => {
       const emoji = statusEmoji[o.status] || '❓';
-      const title = o.stockUnit?.product?.title || 'Produk';
-      return `${emoji} ${title} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
+      const title = o.duration?.app?.name ?? 'Produk';
+      const label = o.duration?.label ?? '';
+      return `${emoji} ${title}${label ? ` (${label})` : ''} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
     });
 
     await ctx.reply(`\u{1F4E6} *Pesanan Saya*\n\n${lines.join('\n')}`, {
@@ -218,8 +275,8 @@ export function createBuyerComposer(
     const orders = await prisma.order.findMany({
       where: { buyerTgUserId: tgUserId },
       include: {
-        stockUnit: {
-          select: { product: { select: { title: true } } },
+        duration: {
+          select: { label: true, app: { select: { name: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -242,8 +299,9 @@ export function createBuyerComposer(
 
     const lines = orders.map((o) => {
       const emoji = statusEmoji[o.status] || '❓';
-      const title = o.stockUnit?.product?.title || 'Produk';
-      return `${emoji} ${title} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
+      const title = o.duration?.app?.name ?? 'Produk';
+      const label = o.duration?.label ?? '';
+      return `${emoji} ${title}${label ? ` (${label})` : ''} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
     });
 
     await ctx.reply(`\u{1F4E6} *Pesanan Saya*\n\n${lines.join('\n')}`, {
