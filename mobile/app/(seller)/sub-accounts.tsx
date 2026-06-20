@@ -16,10 +16,13 @@ interface SubAccount {
 }
 
 export default function SubAccountsScreen() {
-  const { accountId, accountEmail, durationId } = useLocalSearchParams<{
+  const { accountId, accountEmail, durationId, durationLabel, appId, appName } = useLocalSearchParams<{
     accountId: string;
     accountEmail: string;
     durationId: string;
+    durationLabel: string;
+    appId: string;
+    appName: string;
   }>();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
@@ -53,7 +56,7 @@ export default function SubAccountsScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={() => router.push({ pathname: '/(seller)/add-account', params: { durationId: durationId!, durationLabel: durationLabel || '', appId: appId!, appName: appName || '' } })}>
         <Text style={styles.backBtn}>← Kembali</Text>
       </TouchableOpacity>
 

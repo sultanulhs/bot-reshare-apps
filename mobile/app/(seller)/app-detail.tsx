@@ -32,6 +32,11 @@ interface AppDetail {
   durations: Duration[];
 }
 
+function getPrefix(label: string): string {
+  const match = label.match(/^([A-Za-z]+)\s/);
+  return match ? match[1] : 'Durasi';
+}
+
 const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
   AKUN_READY: 'Akun Ready',
   MANUAL: 'Manual',
@@ -112,21 +117,18 @@ export default function AppDetailScreen() {
 
   const sections = useMemo(() => {
     if (!durations.length) return [];
-    const groups: Record<ProductType, Duration[]> = { AKUN_READY: [], MANUAL: [] };
+    const groups: Record<string, Duration[]> = {};
     durations.forEach((d) => {
-      if (groups[d.productType]) groups[d.productType].push(d);
+      const prefix = getPrefix(d.label);
+      if (!groups[prefix]) groups[prefix] = [];
+      groups[prefix].push(d);
     });
-    return Object.entries(groups)
-      .filter(([, items]) => items.length > 0)
-      .map(([type, data]) => ({
-        title: PRODUCT_TYPE_LABELS[type as ProductType],
-        data,
-      }));
+    return Object.entries(groups).map(([title, data]) => ({ title, data }));
   }, [durations]);
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/(seller)/products')}>
         <Text style={styles.backBtnText}>← Kembali</Text>
       </TouchableOpacity>
       <Text style={styles.header}>{appName || appDetail?.template?.name || 'Detail Aplikasi'}</Text>
@@ -151,6 +153,8 @@ export default function AppDetailScreen() {
                   durationId: item.id,
                   durationLabel: item.label,
                   productType: item.productType,
+                  appId: appId!,
+                  appName: appName || appDetail?.template?.name || '',
                 },
               })
             }

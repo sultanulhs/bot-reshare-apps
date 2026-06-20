@@ -17,9 +17,11 @@ interface Account {
 }
 
 export default function AddAccountScreen() {
-  const { durationId, durationLabel } = useLocalSearchParams<{
+  const { durationId, durationLabel, appId, appName } = useLocalSearchParams<{
     durationId: string;
     durationLabel: string;
+    appId: string;
+    appName: string;
   }>();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
@@ -52,7 +54,7 @@ export default function AddAccountScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={() => router.push({ pathname: '/(seller)/app-detail', params: { appId: appId!, appName: appName || '' } })}>
         <Text style={styles.backBtn}>← Kembali</Text>
       </TouchableOpacity>
 
@@ -70,7 +72,7 @@ export default function AddAccountScreen() {
             style={styles.card}
             onPress={() => router.push({
               pathname: '/(seller)/sub-accounts',
-              params: { accountId: item.id, accountEmail: item.email, durationId },
+              params: { accountId: item.id, accountEmail: item.email, durationId, durationLabel, appId: appId!, appName: appName || '' },
             })}
           >
             <View style={styles.cardRow}>

@@ -38,7 +38,7 @@ export class CatalogService {
     const where: any = { sellerId };
     if (categoryId) where.template = { categoryId };
 
-    return this.prisma.app.findMany({
+    const apps = await this.prisma.app.findMany({
       where,
       include: {
         template: {
@@ -50,11 +50,20 @@ export class CatalogService {
         },
         durations: {
           where: { active: true },
-          select: { id: true, label: true, days: true, basePrice: true, productType: true },
+          include: {
+            _count: { select: { accounts: true } },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return apps.map((app) => ({
+      ...app,
+      _count: { durations: app.durations.length },
+      stockCount: app.durations.reduce((sum, d) => sum + d._count.accounts, 0),
+      durations: undefined,
+    }));
   }
 
   async createApp(sellerId: string, dto: CreateAppDto) {
@@ -164,7 +173,7 @@ export class CatalogService {
         basePrice: d.basePrice,
         productType: d.productType,
         buyerInfoLabel: d.buyerInfoLabel,
-        availableStock: d._count.accounts,
+        stockCount: d._count.accounts,
       })),
     };
   }
