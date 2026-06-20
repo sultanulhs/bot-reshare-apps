@@ -11,6 +11,8 @@ import { TelegramModule } from './telegram/telegram.module';
 import { OrderModule } from './order/order.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { HealthModule } from './health/health.module';
+import { EmailModule } from './email/email.module';
+import { VerificationModule } from './verification/verification.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { HealthModule } from './health/health.module';
     OrderModule,
     WebhookModule,
     HealthModule,
+    EmailModule,
+    VerificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
