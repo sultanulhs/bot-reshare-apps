@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Bot, Context } from 'grammy';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +17,7 @@ export class TelegramService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly botConfigService: BotConfigService,
     private readonly catalogService: CatalogService,
+    @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
   ) {
     const token = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
