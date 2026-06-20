@@ -94,6 +94,7 @@ export default function ProfileScreen() {
         <Text style={styles.name}>{me?.ownerName}</Text>
         <Text style={styles.storeName}>{me?.storeName}</Text>
         <Text style={styles.email}>{me?.email}</Text>
+        <Text style={styles.phone}>{me?.phone}</Text>
         <Text style={styles.status}>Status: {me?.status}</Text>
       </View>
 
@@ -232,6 +233,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 18, fontWeight: 'bold' },
   storeName: { fontSize: 16, color: '#333', marginTop: 2 },
   email: { fontSize: 14, color: '#666' },
+  phone: { fontSize: 14, color: '#666', marginTop: 2 },
   status: { fontSize: 14, color: '#2563eb', marginTop: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   verifyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },

@@ -29,6 +29,7 @@ export class SellerService {
       id: seller.id,
       ownerName: seller.ownerName,
       storeName: seller.storeName,
+      phone: seller.phone,
       status: seller.status,
       email: seller.user.email,
       storeCode: seller.storeCode,
