@@ -29,7 +29,6 @@ enum StockStatus {
 
 enum ProductType {
   AKUN_READY
-  SUB_AKUN
   MANUAL
 }
 

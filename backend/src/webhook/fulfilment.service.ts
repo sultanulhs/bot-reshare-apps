@@ -54,10 +54,7 @@ export class FulfilmentService {
 
     if (productType === 'AKUN_READY') {
       await this.fulfilAkunReady(order);
-    } else if (productType === 'SUB_AKUN') {
-      await this.fulfilSubAkun(order);
     } else {
-      // MANUAL
       await this.setWaitingSeller(order);
     }
   }
@@ -135,68 +132,6 @@ export class FulfilmentService {
     }
 
     this.logger.log(`Order ${order.id} fulfilled (AKUN_READY)`);
-  }
-
-  private async fulfilSubAkun(order: any) {
-    const account = order.account;
-    const subAccount = order.subAccount;
-
-    if (!account || !subAccount) {
-      this.logger.error(`Missing account/subAccount for SUB_AKUN order ${order.id}`);
-      await this.setWaitingSeller(order);
-      return;
-    }
-
-    const email = this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
-    const password = this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
-    const name = this.crypto.decrypt(subAccount.encName, subAccount.nameIv, subAccount.nameTag);
-    const pin = this.crypto.decrypt(subAccount.encPin, subAccount.pinIv, subAccount.pinTag);
-
-    const sellerId = order.duration.app.sellerId;
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: 'FULFILLED', fulfilledAt: new Date() },
-      });
-
-      await tx.subAccount.update({
-        where: { id: subAccount.id },
-        data: { status: 'SOLD' },
-      });
-
-      await tx.ledgerEntry.create({
-        data: {
-          sellerId,
-          orderId: order.id,
-          type: 'SELLER_CREDIT',
-          amount: order.basePrice,
-        },
-      });
-
-      await tx.ledgerEntry.create({
-        data: {
-          orderId: order.id,
-          type: 'OPERATOR_MARKUP',
-          amount: order.markup,
-        },
-      });
-    });
-
-    try {
-      await this.telegram.bot.api.sendMessage(
-        order.buyerTgUserId.toString(),
-        `✅ Pembayaran berhasil!\n\n` +
-          `📦 ${order.duration.app.template.name} (${order.duration.label})\n` +
-          `📧 Email: ${email}\n🔑 Password: ${password}\n` +
-          `👤 Profil: ${name}\n🔐 PIN: ${pin}\n\n` +
-          `Simpan dengan aman. Gunakan /report jika ada masalah.`,
-      );
-    } catch (err: any) {
-      this.logger.error(`Failed to send credentials to buyer: ${err.message}`);
-    }
-
-    this.logger.log(`Order ${order.id} fulfilled (SUB_AKUN)`);
   }
 
   private async setWaitingSeller(order: any) {

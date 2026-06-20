@@ -13,7 +13,7 @@ export class CreateDurationDto {
   @Min(0)
   basePrice!: number;
 
-  @IsEnum(['AKUN_READY', 'SUB_AKUN', 'MANUAL'])
+  @IsEnum(['AKUN_READY', 'MANUAL'])
   productType!: string;
 
   @IsOptional()

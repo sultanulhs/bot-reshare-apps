@@ -62,26 +62,11 @@ export class OrderService {
           where: { id: account.id },
           data: { status: 'LOCKED' },
         });
-        // Lock all sub-accounts too
         await tx.subAccount.updateMany({
           where: { accountId: account.id },
           data: { status: 'LOCKED' },
         });
         accountId = account.id;
-      } else if (duration.productType === 'SUB_AKUN') {
-        const subAccount = await tx.subAccount.findFirst({
-          where: { status: 'AVAILABLE', account: { durationId: duration.id } },
-          include: { account: true },
-        });
-        if (!subAccount) {
-          throw new BadRequestException('No sub-account available');
-        }
-        await tx.subAccount.update({
-          where: { id: subAccount.id },
-          data: { status: 'LOCKED' },
-        });
-        subAccountId = subAccount.id;
-        accountId = subAccount.accountId;
       }
       // MANUAL: no account needed
 

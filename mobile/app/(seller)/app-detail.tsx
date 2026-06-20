@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import api from '../../src/lib/api';
 
-type ProductType = 'AKUN_READY' | 'SUB_AKUN' | 'MANUAL';
+type ProductType = 'AKUN_READY' | 'MANUAL';
 
 interface Duration {
   id: string;
@@ -34,7 +34,6 @@ interface AppDetail {
 
 const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
   AKUN_READY: 'Akun Ready',
-  SUB_AKUN: 'Sub-Akun',
   MANUAL: 'Manual',
 };
 
@@ -171,7 +170,7 @@ export default function AppDetailScreen() {
 
             <Text style={styles.label}>Tipe Produk</Text>
             <View style={styles.typeRow}>
-              {([['AKUN_READY', 'Akun Ready'], ['SUB_AKUN', 'Sub-Akun'], ['MANUAL', 'Manual']] as const).map(([val, label]) => (
+              {([['AKUN_READY', 'Akun Ready'], ['MANUAL', 'Manual']] as const).map(([val, label]) => (
                 <TouchableOpacity
                   key={val}
                   style={[styles.typeChip, form.productType === val && styles.typeChipSelected]}

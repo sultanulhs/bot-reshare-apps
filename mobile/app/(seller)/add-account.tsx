@@ -68,7 +68,7 @@ export default function AddAccountScreen() {
     addAccount.mutate();
   };
 
-  const showSubAkun = productType === 'SUB_AKUN';
+  const showSubAkun = productType === 'AKUN_READY';
 
   return (
     <View style={styles.container}>
