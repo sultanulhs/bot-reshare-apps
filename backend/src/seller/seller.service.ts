@@ -26,7 +26,8 @@ export class SellerService {
     }
     return {
       id: seller.id,
-      name: seller.name,
+      ownerName: seller.ownerName,
+      storeName: seller.storeName,
       status: seller.status,
       email: seller.user.email,
       storeCode: seller.storeCode,

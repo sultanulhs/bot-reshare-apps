@@ -30,7 +30,8 @@ export class AdminSellerService {
 
     return sellers.map((s) => ({
       id: s.id,
-      name: s.name,
+      ownerName: s.ownerName,
+      storeName: s.storeName,
       email: s.user.email,
       phone: s.phone,
       status: s.status,
@@ -54,7 +55,8 @@ export class AdminSellerService {
 
     const base = {
       id: seller.id,
-      name: seller.name,
+      ownerName: seller.ownerName,
+      storeName: seller.storeName,
       email: seller.user.email,
       phone: seller.phone,
       status: seller.status,

@@ -39,7 +39,8 @@ describe('AdminSellerService', () => {
       prisma.seller.findMany.mockResolvedValue([
         {
           id: 's1',
-          name: 'Seller1',
+          ownerName: 'Seller1',
+          storeName: 'Toko Seller1',
           phone: '081',
           status: 'PENDING',
           createdAt: new Date(),
@@ -49,7 +50,7 @@ describe('AdminSellerService', () => {
       ]);
 
       const result = await service.listSellers();
-      expect(result[0].name).toBe('Seller1');
+      expect(result[0].ownerName).toBe('Seller1');
       expect(result[0].productCount).toBe(3);
     });
   });
@@ -111,7 +112,8 @@ describe('AdminSellerService', () => {
     it('should return decrypted payout for PROFILE_SUBMITTED seller', async () => {
       prisma.seller.findUnique.mockResolvedValue({
         id: 's1',
-        name: 'Seller',
+        ownerName: 'Seller',
+        storeName: 'Toko Seller',
         phone: '081',
         status: 'PROFILE_SUBMITTED',
         user: { email: 'test@test.com' },
@@ -130,7 +132,8 @@ describe('AdminSellerService', () => {
     it('should not include profile for PENDING seller', async () => {
       prisma.seller.findUnique.mockResolvedValue({
         id: 's1',
-        name: 'Seller',
+        ownerName: 'Seller',
+        storeName: 'Toko Seller',
         phone: '081',
         status: 'PENDING',
         user: { email: 'test@test.com' },

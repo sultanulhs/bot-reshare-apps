@@ -51,7 +51,8 @@ describe('SellerService', () => {
     it('should return seller status for a valid user', async () => {
       prisma.seller.findUnique.mockResolvedValue({
         id: 'seller-1',
-        name: 'Test Seller',
+        ownerName: 'Test Seller',
+        storeName: 'Toko Test',
         status: 'PENDING',
         storeCode: null,
         user: { email: 'test@test.com' },
@@ -60,7 +61,8 @@ describe('SellerService', () => {
       const result = await service.getStatus('user-1');
       expect(result).toEqual({
         id: 'seller-1',
-        name: 'Test Seller',
+        ownerName: 'Test Seller',
+        storeName: 'Toko Test',
         status: 'PENDING',
         email: 'test@test.com',
         storeCode: null,
