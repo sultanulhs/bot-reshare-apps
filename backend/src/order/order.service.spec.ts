@@ -84,7 +84,7 @@ describe('OrderService', () => {
         basePrice: 50000,
         active: true,
         productType: 'AKUN_READY',
-        app: { name: 'Netflix', sellerId: 'seller-1' },
+        app: { template: { name: 'Netflix' }, sellerId: 'seller-1' },
       });
       prisma.account.findFirst.mockResolvedValue({ id: 'acc-1' });
       prisma.account.update.mockResolvedValue({ id: 'acc-1', status: 'LOCKED' });
@@ -119,7 +119,7 @@ describe('OrderService', () => {
         basePrice: 50000,
         active: true,
         productType: 'AKUN_READY',
-        app: { name: 'Netflix', sellerId: 'seller-1' },
+        app: { template: { name: 'Netflix' }, sellerId: 'seller-1' },
       });
       prisma.account.findFirst.mockResolvedValue(null);
 

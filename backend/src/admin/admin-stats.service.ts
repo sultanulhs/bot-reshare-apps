@@ -71,7 +71,7 @@ export class AdminStatsService {
         where,
         include: {
           duration: {
-            select: { label: true, app: { select: { name: true } } },
+            select: { label: true, app: { select: { template: { select: { name: true } } } } },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -84,7 +84,7 @@ export class AdminStatsService {
     return {
       items: items.map((o) => ({
         id: o.id,
-        productTitle: o.duration?.app?.name ?? 'Unknown',
+        productTitle: o.duration?.app?.template?.name ?? 'Unknown',
         totalAmount: o.totalAmount,
         status: o.status,
         createdAt: o.createdAt,

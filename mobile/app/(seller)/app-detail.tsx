@@ -27,8 +27,8 @@ interface Duration {
 
 interface AppDetail {
   id: string;
-  name: string;
-  description?: string;
+  template: { id: string; name: string; category?: { id: string; name: string; icon?: string } };
+  notes?: string;
   durations: Duration[];
 }
 
@@ -103,7 +103,7 @@ export default function AppDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>{appName || appDetail?.name || 'Detail Aplikasi'}</Text>
+      <Text style={styles.header}>{appName || appDetail?.template?.name || 'Detail Aplikasi'}</Text>
 
       <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
         <Text style={styles.addBtnText}>+ Tambah Durasi</Text>

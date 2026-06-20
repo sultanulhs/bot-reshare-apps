@@ -78,6 +78,13 @@ export class SellerController {
     return this.catalogService.createCategory(req.seller.id, dto);
   }
 
+  // --- Template endpoints ---
+
+  @Get('templates')
+  async getTemplates(@Query('categoryId') categoryId: string) {
+    return this.catalogService.getTemplates(categoryId);
+  }
+
   // --- App endpoints ---
 
   @Get('apps')

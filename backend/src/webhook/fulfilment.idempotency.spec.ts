@@ -51,7 +51,7 @@ describe('FulfilmentService -- Idempotency', () => {
         duration: {
           productType: 'AKUN_READY',
           label: '1 Bulan',
-          app: { name: 'Test', sellerId: 'sel1' },
+          app: { template: { name: 'Test' }, sellerId: 'sel1' },
         },
         account: {
           id: 'acc-1',
@@ -95,7 +95,7 @@ describe('FulfilmentService -- Idempotency', () => {
         duration: {
           productType: 'AKUN_READY',
           label: '1 Bulan',
-          app: { name: 'Test', sellerId: 'sel1' },
+          app: { template: { name: 'Test' }, sellerId: 'sel1' },
         },
         account: {
           id: 'acc-1',

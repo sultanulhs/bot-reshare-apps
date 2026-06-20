@@ -41,7 +41,7 @@ export class OrderService {
   async createOrder(params: CreateOrderParams) {
     const duration = await this.prisma.duration.findFirst({
       where: { id: params.durationId, active: true, app: { sellerId: params.sellerId, active: true } },
-      include: { app: true },
+      include: { app: { include: { template: true } } },
     });
     if (!duration) {
       throw new BadRequestException('Duration not available');
@@ -94,7 +94,7 @@ export class OrderService {
       const danaResult = await this.danaService.createQrisOrder({
         partnerReferenceNo,
         amount: totalAmount,
-        title: duration.app.name,
+        title: duration.app.template.name,
       });
 
       const order = await tx.order.create({
@@ -179,7 +179,7 @@ export class OrderService {
       },
       include: {
         duration: {
-          include: { app: { select: { name: true } } },
+          include: { app: { include: { template: { select: { name: true } } } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -193,7 +193,7 @@ export class OrderService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { duration: { include: { app: true } } },
+      include: { duration: { include: { app: { include: { template: true } } } } },
     });
 
     if (!order || order.status !== 'WAITING_SELLER') {
@@ -237,7 +237,7 @@ export class OrderService {
     try {
       await this.telegramService.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
-        `✅ Kredensial sudah siap!\n\n📦 ${order.duration!.app.name} (${order.duration!.label})\n🔑 ${credentials}\n\nSimpan dengan aman.`,
+        `✅ Kredensial sudah siap!\n\n📦 ${order.duration!.app.template.name} (${order.duration!.label})\n🔑 ${credentials}\n\nSimpan dengan aman.`,
       );
     } catch (err: any) {
       this.logger.warn(

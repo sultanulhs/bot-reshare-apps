@@ -118,7 +118,7 @@ export function createBuyerComposer(
 
     const keyboard = new InlineKeyboard();
     for (const app of apps) {
-      keyboard.text(app.name, `app_${app.id}`).row();
+      keyboard.text(app.template.name, `app_${app.id}`).row();
     }
     keyboard.text('\u{2B05}️ Kembali', 'catalog').row();
 
@@ -149,12 +149,12 @@ export function createBuyerComposer(
         )
         .row();
     }
-    if (appWithStock.category) {
-      keyboard.text('\u{2B05}️ Kembali', `cat_${appWithStock.category.id}`).row();
+    if (appWithStock.template?.category) {
+      keyboard.text('\u{2B05}️ Kembali', `cat_${appWithStock.template.category.id}`).row();
     }
 
     await ctx.reply(
-      `\u{1F4F1} *${appWithStock.name}*\n\nPilih durasi langganan:`,
+      `\u{1F4F1} *${appWithStock.template.name}*\n\nPilih durasi langganan:`,
       { reply_markup: keyboard, parse_mode: 'Markdown' },
     );
   });
@@ -166,7 +166,7 @@ export function createBuyerComposer(
 
     const duration = await prisma.duration.findUnique({
       where: { id: durationId },
-      include: { app: true },
+      include: { app: { include: { template: true } } },
     });
 
     if (!duration || !duration.active) {
@@ -180,7 +180,7 @@ export function createBuyerComposer(
 
     await ctx.reply(
       `\u{1F6D2} *Detail Paket*\n\n` +
-        `\u{1F4F1} ${duration.app.name}\n` +
+        `\u{1F4F1} ${duration.app.template.name}\n` +
         `\u{23F3} Durasi: ${duration.label}\n` +
         `\u{1F4B0} Harga: Rp${duration.basePrice.toLocaleString('id-ID')}\n\n` +
         `_Harga final akan ditampilkan saat pembayaran._\n\n` +
@@ -236,7 +236,7 @@ export function createBuyerComposer(
       where: { buyerTgUserId: tgUserId },
       include: {
         duration: {
-          select: { label: true, app: { select: { name: true } } },
+          select: { label: true, app: { select: { template: { select: { name: true } } } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -259,7 +259,7 @@ export function createBuyerComposer(
 
     const lines = orders.map((o) => {
       const emoji = statusEmoji[o.status] || '❓';
-      const title = o.duration?.app?.name ?? 'Produk';
+      const title = o.duration?.app?.template?.name ?? 'Produk';
       const label = o.duration?.label ?? '';
       return `${emoji} ${title}${label ? ` (${label})` : ''} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
     });
@@ -276,7 +276,7 @@ export function createBuyerComposer(
       where: { buyerTgUserId: tgUserId },
       include: {
         duration: {
-          select: { label: true, app: { select: { name: true } } },
+          select: { label: true, app: { select: { template: { select: { name: true } } } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -299,7 +299,7 @@ export function createBuyerComposer(
 
     const lines = orders.map((o) => {
       const emoji = statusEmoji[o.status] || '❓';
-      const title = o.duration?.app?.name ?? 'Produk';
+      const title = o.duration?.app?.template?.name ?? 'Produk';
       const label = o.duration?.label ?? '';
       return `${emoji} ${title}${label ? ` (${label})` : ''} - Rp${o.totalAmount.toLocaleString('id-ID')} [${o.status}]`;
     });

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateAppDto } from './dto/create-app.dto';
@@ -27,14 +27,27 @@ export class CatalogService {
     });
   }
 
+  async getTemplates(categoryId: string) {
+    return this.prisma.appTemplate.findMany({
+      where: { categoryId },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async getApps(sellerId: string, categoryId?: string) {
     const where: any = { sellerId };
-    if (categoryId) where.categoryId = categoryId;
+    if (categoryId) where.template = { categoryId };
 
     return this.prisma.app.findMany({
       where,
       include: {
-        category: { select: { id: true, name: true, icon: true } },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: { select: { id: true, name: true, icon: true } },
+          },
+        },
         durations: {
           where: { active: true },
           select: { id: true, label: true, days: true, basePrice: true, productType: true },
@@ -45,12 +58,44 @@ export class CatalogService {
   }
 
   async createApp(sellerId: string, dto: CreateAppDto) {
+    let templateId = dto.templateId;
+
+    if (!templateId) {
+      if (!dto.name || !dto.categoryId) {
+        throw new BadRequestException(
+          'Either templateId or both name and categoryId must be provided',
+        );
+      }
+
+      const template = await this.prisma.appTemplate.upsert({
+        where: {
+          name_categoryId: { name: dto.name, categoryId: dto.categoryId },
+        },
+        update: {},
+        create: {
+          categoryId: dto.categoryId,
+          name: dto.name,
+          isDefault: false,
+          createdBy: sellerId,
+        },
+      });
+      templateId = template.id;
+    }
+
     return this.prisma.app.create({
       data: {
         sellerId,
-        categoryId: dto.categoryId,
-        name: dto.name,
-        description: dto.description,
+        templateId,
+        notes: dto.notes,
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: { select: { id: true, name: true, icon: true } },
+          },
+        },
       },
     });
   }
@@ -86,7 +131,13 @@ export class CatalogService {
     const app = await this.prisma.app.findUnique({
       where: { id: appId },
       include: {
-        category: { select: { id: true, name: true, icon: true } },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: { select: { id: true, name: true, icon: true } },
+          },
+        },
         durations: {
           where: { active: true },
           include: {

@@ -32,7 +32,7 @@ export class LedgerService {
           select: {
             fulfilledAt: true,
             duration: {
-              select: { label: true, app: { select: { name: true } } },
+              select: { label: true, app: { select: { template: { select: { name: true } } } } },
             },
           },
         },
@@ -42,7 +42,7 @@ export class LedgerService {
 
     return entries.map((e) => ({
       orderId: e.orderId,
-      productTitle: e.order?.duration?.app?.name ?? 'Unknown',
+      productTitle: e.order?.duration?.app?.template?.name ?? 'Unknown',
       amount: e.amount,
       soldAt: e.order?.fulfilledAt ?? e.createdAt,
     }));

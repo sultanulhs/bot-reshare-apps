@@ -96,6 +96,7 @@ model Seller {
   status               SellerStatus          @default(PENDING)
   categories           Category[]
   apps                 App[]
+  appTemplates         AppTemplate[]
   ledgerEntries        LedgerEntry[]
   profile              SellerProfile?
   subscriptions        Subscription[]
@@ -141,29 +142,44 @@ model SellerProfile {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String
-  icon      String?
-  isDefault Boolean  @default(false)
-  sellerId  String?
-  seller    Seller?  @relation(fields: [sellerId], references: [id])
-  apps      App[]
-  createdAt DateTime @default(now())
+  id           String        @id @default(cuid())
+  name         String
+  icon         String?
+  isDefault    Boolean       @default(false)
+  sellerId     String?
+  seller       Seller?       @relation(fields: [sellerId], references: [id])
+  appTemplates AppTemplate[]
+  createdAt    DateTime      @default(now())
 
   @@unique([name, sellerId])
 }
 
+model AppTemplate {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  name       String
+  isDefault  Boolean  @default(false)
+  createdBy  String?
+  creator    Seller?  @relation(fields: [createdBy], references: [id])
+  apps       App[]
+  createdAt  DateTime @default(now())
+
+  @@unique([name, categoryId])
+}
+
 model App {
-  id          String     @id @default(cuid())
-  categoryId  String
-  category    Category   @relation(fields: [categoryId], references: [id])
-  sellerId    String
-  seller      Seller     @relation(fields: [sellerId], references: [id])
-  name        String
-  description String?
-  active      Boolean    @default(true)
-  durations   Duration[]
-  createdAt   DateTime   @default(now())
+  id         String      @id @default(cuid())
+  templateId String
+  template   AppTemplate @relation(fields: [templateId], references: [id])
+  sellerId   String
+  seller     Seller      @relation(fields: [sellerId], references: [id])
+  notes      String?
+  active     Boolean     @default(true)
+  durations  Duration[]
+  createdAt  DateTime    @default(now())
+
+  @@unique([templateId, sellerId])
 }
 
 model Duration {

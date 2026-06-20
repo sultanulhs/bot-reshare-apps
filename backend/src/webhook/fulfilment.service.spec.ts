@@ -70,7 +70,7 @@ describe('FulfilmentService', () => {
         duration: {
           productType: 'AKUN_READY',
           label: '1 Bulan',
-          app: { name: 'Netflix', sellerId: 'seller-1' },
+          app: { template: { name: 'Netflix' }, sellerId: 'seller-1' },
         },
         account: {
           id: 'acc-1',
@@ -132,7 +132,7 @@ describe('FulfilmentService', () => {
         duration: {
           productType: 'MANUAL',
           label: '1 Bulan',
-          app: { name: 'Custom App', sellerId: 'seller-1' },
+          app: { template: { name: 'Custom App' }, sellerId: 'seller-1' },
         },
         account: null,
         subAccount: null,

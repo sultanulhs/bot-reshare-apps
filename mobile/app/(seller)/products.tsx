@@ -11,12 +11,18 @@ interface Category {
   isDefault?: boolean;
 }
 
-interface App {
+interface AppTemplate {
   id: string;
   name: string;
   categoryId: string;
-  category?: { name: string };
-  description?: string;
+  isDefault: boolean;
+}
+
+interface App {
+  id: string;
+  templateId: string;
+  template?: { id: string; name: string; category?: { id: string; name: string; icon?: string } };
+  notes?: string;
   active: boolean;
   _count?: { durations: number };
   stockCount?: number;
@@ -27,9 +33,11 @@ export default function ProductsScreen() {
   const [showAdd, setShowAdd] = useState(false);
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('');
-  const [form, setForm] = useState({ categoryId: '', name: '', description: '' });
+  const [customName, setCustomName] = useState('');
+  const [form, setForm] = useState({ categoryId: '', templateId: '', notes: '' });
 
   const { data: apps, isLoading } = useQuery<App[]>({
     queryKey: ['seller-apps'],
@@ -42,13 +50,20 @@ export default function ProductsScreen() {
     enabled: showAdd,
   });
 
+  const { data: templates, isLoading: templatesLoading } = useQuery<AppTemplate[]>({
+    queryKey: ['seller-templates', form.categoryId],
+    queryFn: () => api.get(`/seller/templates?categoryId=${form.categoryId}`).then((r) => r.data),
+    enabled: !!form.categoryId,
+  });
+
   const addApp = useMutation({
-    mutationFn: (data: { categoryId: string; name: string; description?: string }) =>
+    mutationFn: (data: { templateId?: string; categoryId?: string; name?: string; notes?: string }) =>
       api.post('/seller/apps', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
       setShowAdd(false);
-      setForm({ categoryId: '', name: '', description: '' });
+      setForm({ categoryId: '', templateId: '', notes: '' });
+      setCustomName('');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -58,7 +73,8 @@ export default function ProductsScreen() {
       api.post('/seller/categories', data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['seller-categories'] });
-      setForm({ ...form, categoryId: res.data.id });
+      setForm({ ...form, categoryId: res.data.id, templateId: '' });
+      setCustomName('');
       setShowAddCategory(false);
       setShowCatPicker(false);
       setNewCatName('');
@@ -68,19 +84,27 @@ export default function ProductsScreen() {
   });
 
   const handleSubmit = () => {
-    if (!form.categoryId) {
+    if (!form.templateId && !customName.trim()) {
+      Alert.alert('Error', 'Pilih template atau masukkan nama aplikasi');
+      return;
+    }
+    if (!form.templateId && !form.categoryId) {
       Alert.alert('Error', 'Pilih kategori terlebih dahulu');
       return;
     }
-    if (!form.name.trim()) {
-      Alert.alert('Error', 'Nama aplikasi harus diisi');
-      return;
+
+    if (form.templateId) {
+      addApp.mutate({
+        templateId: form.templateId,
+        ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
+      });
+    } else {
+      addApp.mutate({
+        categoryId: form.categoryId,
+        name: customName.trim(),
+        ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
+      });
     }
-    addApp.mutate({
-      categoryId: form.categoryId,
-      name: form.name.trim(),
-      ...(form.description.trim() ? { description: form.description.trim() } : {}),
-    });
   };
 
   const handleAddCategory = () => {
@@ -95,6 +119,7 @@ export default function ProductsScreen() {
   };
 
   const selectedCategory = categories?.find((c) => c.id === form.categoryId);
+  const selectedTemplate = templates?.find((t) => t.id === form.templateId);
 
   return (
     <View style={styles.container}>
@@ -106,7 +131,8 @@ export default function ProductsScreen() {
         data={apps}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          const categoryName = item.category?.name || '-';
+          const categoryName = item.template?.category?.name || '-';
+          const appName = item.template?.name || '-';
           const durationCount = item._count?.durations ?? 0;
           const stockCount = item.stockCount ?? 0;
           return (
@@ -115,11 +141,11 @@ export default function ProductsScreen() {
               onPress={() =>
                 router.push({
                   pathname: '/(seller)/app-detail',
-                  params: { appId: item.id, appName: item.name },
+                  params: { appId: item.id, appName },
                 })
               }
             >
-              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.cardTitle}>{appName}</Text>
               <Text style={styles.cardSub}>{categoryName}</Text>
               <View style={styles.cardRow}>
                 <Text style={styles.cardMeta}>{durationCount} durasi</Text>
@@ -164,7 +190,11 @@ export default function ProductsScreen() {
                         <TouchableOpacity
                           key={cat.id}
                           style={[styles.dropdownItem, form.categoryId === cat.id && styles.dropdownItemSelected]}
-                          onPress={() => { setForm({ ...form, categoryId: cat.id }); setShowCatPicker(false); }}
+                          onPress={() => {
+                            setForm({ ...form, categoryId: cat.id, templateId: '' });
+                            setCustomName('');
+                            setShowCatPicker(false);
+                          }}
                         >
                           <Text style={[styles.dropdownItemText, form.categoryId === cat.id && styles.dropdownItemTextSelected]}>
                             {cat.icon ? `${cat.icon} ` : ''}{cat.name}
@@ -222,18 +252,76 @@ export default function ProductsScreen() {
               </View>
             )}
 
-            {/* App Info */}
+            {/* Template Selector (shown after category is selected) */}
+            {form.categoryId ? (
+              <>
+                <Text style={styles.label}>Aplikasi</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setShowTemplatePicker(!showTemplatePicker)}
+                >
+                  <Text style={selectedTemplate ? styles.dropdownText : styles.dropdownPlaceholder}>
+                    {selectedTemplate ? selectedTemplate.name : 'Pilih aplikasi...'}
+                  </Text>
+                  <Text style={styles.dropdownArrow}>{showTemplatePicker ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showTemplatePicker && (
+                  <View style={styles.dropdownContainer}>
+                    <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                      {templatesLoading ? (
+                        <ActivityIndicator style={{ padding: 16 }} />
+                      ) : (
+                        <>
+                          {templates?.map((tpl) => (
+                            <TouchableOpacity
+                              key={tpl.id}
+                              style={[styles.dropdownItem, form.templateId === tpl.id && styles.dropdownItemSelected]}
+                              onPress={() => {
+                                setForm({ ...form, templateId: tpl.id });
+                                setCustomName('');
+                                setShowTemplatePicker(false);
+                              }}
+                            >
+                              <Text style={[styles.dropdownItemText, form.templateId === tpl.id && styles.dropdownItemTextSelected]}>
+                                {tpl.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </>
+                      )}
+                    </ScrollView>
+                    <TouchableOpacity
+                      style={styles.addCatBtn}
+                      onPress={() => {
+                        setForm({ ...form, templateId: '' });
+                        setShowTemplatePicker(false);
+                      }}
+                    >
+                      <Text style={styles.addCatBtnText}>+ Nama Custom</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Custom name input (when no template selected) */}
+                {!form.templateId && (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nama aplikasi custom"
+                    value={customName}
+                    onChangeText={setCustomName}
+                  />
+                )}
+              </>
+            ) : null}
+
+            {/* Notes */}
             <TextInput
               style={styles.input}
-              placeholder="Nama aplikasi"
-              value={form.name}
-              onChangeText={(v) => setForm({ ...form, name: v })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Deskripsi (opsional)"
-              value={form.description}
-              onChangeText={(v) => setForm({ ...form, description: v })}
+              placeholder="Ketentuan / Notes (opsional)"
+              value={form.notes}
+              onChangeText={(v) => setForm({ ...form, notes: v })}
+              multiline
             />
 
             <TouchableOpacity
@@ -245,7 +333,14 @@ export default function ProductsScreen() {
                 {addApp.isPending ? 'Menyimpan...' : 'Simpan'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setShowAdd(false); setShowCatPicker(false); setShowAddCategory(false); }}>
+            <TouchableOpacity onPress={() => {
+              setShowAdd(false);
+              setShowCatPicker(false);
+              setShowAddCategory(false);
+              setShowTemplatePicker(false);
+              setForm({ categoryId: '', templateId: '', notes: '' });
+              setCustomName('');
+            }}>
               <Text style={styles.cancel}>Batal</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -273,7 +368,7 @@ const styles = StyleSheet.create({
   modalScroll: { maxHeight: '85%', margin: 16 },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
+  label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500', marginTop: 8 },
   // Dropdown
   dropdown: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12,

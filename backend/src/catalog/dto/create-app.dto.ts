@@ -1,15 +1,20 @@
 import { IsString, MinLength, IsOptional } from 'class-validator';
 
 export class CreateAppDto {
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  categoryId!: string;
-
-  @IsString()
-  @MinLength(1)
-  name!: string;
+  templateId?: string;
 
   @IsOptional()
   @IsString()
-  description?: string;
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

@@ -29,7 +29,7 @@ export class FulfilmentService {
     const order = await this.prisma.order.findUnique({
       where: { partnerReferenceNo: refNo },
       include: {
-        duration: { include: { app: true } },
+        duration: { include: { app: { include: { template: true } } } },
         account: { include: { subAccounts: true } },
         subAccount: true,
       },
@@ -126,7 +126,7 @@ export class FulfilmentService {
       await this.telegram.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
         `✅ Pembayaran berhasil!\n\n` +
-          `📦 ${order.duration.app.name} (${order.duration.label})\n` +
+          `📦 ${order.duration.app.template.name} (${order.duration.label})\n` +
           `${credentialText}\n\n` +
           `Simpan dengan aman. Gunakan /report jika ada masalah.`,
       );
@@ -187,7 +187,7 @@ export class FulfilmentService {
       await this.telegram.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
         `✅ Pembayaran berhasil!\n\n` +
-          `📦 ${order.duration.app.name} (${order.duration.label})\n` +
+          `📦 ${order.duration.app.template.name} (${order.duration.label})\n` +
           `📧 Email: ${email}\n🔑 Password: ${password}\n` +
           `👤 Profil: ${name}\n🔐 PIN: ${pin}\n\n` +
           `Simpan dengan aman. Gunakan /report jika ada masalah.`,
