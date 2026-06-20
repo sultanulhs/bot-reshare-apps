@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import QRCode from 'react-native-qrcode-svg';
 import api from '../../src/lib/api';
 
 export default function SubscriptionPaymentScreen() {
   const { planId, planName } = useLocalSearchParams<{ planId: string; planName: string }>();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
-  const [qrContent, setQrContent] = useState('');
+  const [qrImageBase64, setQrImageBase64] = useState('');
   const [refNo, setRefNo] = useState('');
   const [error, setError] = useState('');
 
@@ -18,7 +17,7 @@ export default function SubscriptionPaymentScreen() {
     (async () => {
       try {
         const { data } = await api.post('/seller/subscription/checkout', { planId });
-        setQrContent(data.qrContent);
+        setQrImageBase64(data.qrImageBase64);
         setRefNo(data.partnerReferenceNo);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Gagal membuat pembayaran');
@@ -60,7 +59,11 @@ export default function SubscriptionPaymentScreen() {
       <Text style={styles.planName}>{planName}</Text>
 
       <View style={styles.qrContainer}>
-        <QRCode value={qrContent} size={250} />
+        <Image
+          source={{ uri: `data:image/png;base64,${qrImageBase64}` }}
+          style={styles.qrImage}
+          resizeMode="contain"
+        />
       </View>
 
       <Text style={styles.instruction}>Scan QR di atas menggunakan aplikasi DANA untuk membayar</Text>
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   planName: { fontSize: 16, color: '#2563eb', marginBottom: 24 },
   qrContainer: {
-    padding: 20,
+    padding: 16,
     backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 3,
@@ -93,6 +96,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     marginBottom: 24,
   },
+  qrImage: { width: 250, height: 250 },
   instruction: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 24, paddingHorizontal: 16 },
   refContainer: { backgroundColor: '#f5f5f5', borderRadius: 8, padding: 12, width: '100%', marginBottom: 24 },
   refLabel: { fontSize: 12, color: '#999' },

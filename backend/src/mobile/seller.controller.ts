@@ -170,6 +170,11 @@ export class SellerController {
   @Post('subscription/checkout')
   async subscriptionCheckout(@Req() req: any, @Body() dto: CheckoutDto) {
     const seller = await this.sellerService.getStatus(req.user.sub);
-    return this.subscriptionService.checkout(seller.id, dto.planId);
+    const result = await this.subscriptionService.checkout(seller.id, dto.planId);
+    return {
+      qrContent: result.qrContent,
+      qrImageBase64: result.qrImage.toString('base64'),
+      partnerReferenceNo: result.partnerReferenceNo,
+    };
   }
 }
