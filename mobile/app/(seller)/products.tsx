@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
@@ -26,6 +26,9 @@ export default function ProductsScreen() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [showCatPicker, setShowCatPicker] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('');
   const [form, setForm] = useState({ categoryId: '', name: '', description: '' });
 
   const { data: apps, isLoading } = useQuery<App[]>({
@@ -33,7 +36,7 @@ export default function ProductsScreen() {
     queryFn: () => api.get('/seller/apps').then((r) => r.data),
   });
 
-  const { data: categories } = useQuery<Category[]>({
+  const { data: categories, isLoading: catsLoading } = useQuery<Category[]>({
     queryKey: ['seller-categories'],
     queryFn: () => api.get('/seller/categories').then((r) => r.data),
     enabled: showAdd,
@@ -46,6 +49,20 @@ export default function ProductsScreen() {
       queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
       setShowAdd(false);
       setForm({ categoryId: '', name: '', description: '' });
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const addCategory = useMutation({
+    mutationFn: (data: { name: string; icon?: string }) =>
+      api.post('/seller/categories', data),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['seller-categories'] });
+      setForm({ ...form, categoryId: res.data.id });
+      setShowAddCategory(false);
+      setShowCatPicker(false);
+      setNewCatName('');
+      setNewCatIcon('');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -65,6 +82,19 @@ export default function ProductsScreen() {
       ...(form.description.trim() ? { description: form.description.trim() } : {}),
     });
   };
+
+  const handleAddCategory = () => {
+    if (!newCatName.trim()) {
+      Alert.alert('Error', 'Nama kategori harus diisi');
+      return;
+    }
+    addCategory.mutate({
+      name: newCatName.trim(),
+      ...(newCatIcon.trim() ? { icon: newCatIcon.trim() } : {}),
+    });
+  };
+
+  const selectedCategory = categories?.find((c) => c.id === form.categoryId);
 
   return (
     <View style={styles.container}>
@@ -103,39 +133,96 @@ export default function ProductsScreen() {
         }
       />
 
+      {/* Modal Tambah Aplikasi */}
       <Modal visible={showAdd} animationType="slide" transparent>
         <View style={styles.modal}>
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>Tambah Aplikasi</Text>
 
+            {/* Kategori Selector */}
             <Text style={styles.label}>Kategori</Text>
             <TouchableOpacity
               style={styles.dropdown}
-              onPress={() => setShowCatPicker(!showCatPicker)}
+              onPress={() => { setShowCatPicker(!showCatPicker); setShowAddCategory(false); }}
             >
-              <Text style={form.categoryId ? styles.dropdownText : styles.dropdownPlaceholder}>
-                {form.categoryId
-                  ? categories?.find((c) => c.id === form.categoryId)?.name || 'Pilih kategori'
+              <Text style={selectedCategory ? styles.dropdownText : styles.dropdownPlaceholder}>
+                {selectedCategory
+                  ? `${selectedCategory.icon ? selectedCategory.icon + ' ' : ''}${selectedCategory.name}`
                   : 'Pilih kategori...'}
               </Text>
               <Text style={styles.dropdownArrow}>{showCatPicker ? '▲' : '▼'}</Text>
             </TouchableOpacity>
+
             {showCatPicker && (
-              <View style={styles.dropdownList}>
-                {categories?.map((cat) => (
+              <View style={styles.dropdownContainer}>
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                  {catsLoading ? (
+                    <ActivityIndicator style={{ padding: 16 }} />
+                  ) : (
+                    <>
+                      {categories?.map((cat) => (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.dropdownItem, form.categoryId === cat.id && styles.dropdownItemSelected]}
+                          onPress={() => { setForm({ ...form, categoryId: cat.id }); setShowCatPicker(false); }}
+                        >
+                          <Text style={[styles.dropdownItemText, form.categoryId === cat.id && styles.dropdownItemTextSelected]}>
+                            {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                          </Text>
+                          {cat.isDefault === false && (
+                            <Text style={styles.customBadge}>Custom</Text>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </>
+                  )}
+                </ScrollView>
+
+                {/* Tambah Kategori Baru */}
+                {!showAddCategory ? (
                   <TouchableOpacity
-                    key={cat.id}
-                    style={[styles.dropdownItem, form.categoryId === cat.id && styles.dropdownItemSelected]}
-                    onPress={() => { setForm({ ...form, categoryId: cat.id }); setShowCatPicker(false); }}
+                    style={styles.addCatBtn}
+                    onPress={() => setShowAddCategory(true)}
                   >
-                    <Text style={[styles.dropdownItemText, form.categoryId === cat.id && styles.dropdownItemTextSelected]}>
-                      {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                    </Text>
+                    <Text style={styles.addCatBtnText}>+ Tambah Kategori Baru</Text>
                   </TouchableOpacity>
-                ))}
+                ) : (
+                  <View style={styles.addCatForm}>
+                    <View style={styles.addCatRow}>
+                      <TextInput
+                        style={styles.iconInput}
+                        placeholder="🏷️"
+                        value={newCatIcon}
+                        onChangeText={setNewCatIcon}
+                        maxLength={2}
+                      />
+                      <TextInput
+                        style={styles.catNameInput}
+                        placeholder="Nama kategori baru"
+                        value={newCatName}
+                        onChangeText={setNewCatName}
+                      />
+                    </View>
+                    <View style={styles.addCatActions}>
+                      <TouchableOpacity
+                        style={styles.addCatSaveBtn}
+                        onPress={handleAddCategory}
+                        disabled={addCategory.isPending}
+                      >
+                        <Text style={styles.addCatSaveBtnText}>
+                          {addCategory.isPending ? 'Menyimpan...' : 'Simpan'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setShowAddCategory(false); setNewCatName(''); setNewCatIcon(''); }}>
+                        <Text style={styles.addCatCancelText}>Batal</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
+            {/* App Info */}
             <TextInput
               style={styles.input}
               placeholder="Nama aplikasi"
@@ -158,10 +245,10 @@ export default function ProductsScreen() {
                 {addApp.isPending ? 'Menyimpan...' : 'Simpan'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowAdd(false)}>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setShowCatPicker(false); setShowAddCategory(false); }}>
               <Text style={styles.cancel}>Batal</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -171,56 +258,65 @@ export default function ProductsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
   addBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 16,
+    backgroundColor: '#2563eb', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16,
   },
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    elevation: 1,
+    backgroundColor: '#fff', borderRadius: 8, padding: 16, marginBottom: 8, elevation: 1,
   },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardSub: { fontSize: 13, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
   cardMeta: { fontSize: 12, color: '#888' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
-  modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
+  modal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
+  modalScroll: { maxHeight: '85%', margin: 16 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
+  // Dropdown
   dropdown: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12,
     marginBottom: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  dropdownText: { fontSize: 16, color: '#333' },
-  dropdownPlaceholder: { fontSize: 16, color: '#999' },
+  dropdownText: { fontSize: 15, color: '#333' },
+  dropdownPlaceholder: { fontSize: 15, color: '#999' },
   dropdownArrow: { fontSize: 12, color: '#999' },
-  dropdownList: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 12,
-    backgroundColor: '#fff', maxHeight: 200, overflow: 'hidden',
+  dropdownContainer: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 12, overflow: 'hidden',
   },
-  dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  dropdownList: { maxHeight: 180 },
+  dropdownItem: {
+    padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
   dropdownItemSelected: { backgroundColor: '#eff6ff' },
   dropdownItemText: { fontSize: 15, color: '#333' },
   dropdownItemTextSelected: { color: '#2563eb', fontWeight: '600' },
+  customBadge: { fontSize: 10, color: '#8b5cf6', backgroundColor: '#f5f3ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  // Add Category
+  addCatBtn: {
+    padding: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e5e7eb', backgroundColor: '#fafafa',
+  },
+  addCatBtnText: { color: '#2563eb', fontWeight: '600', fontSize: 14 },
+  addCatForm: { padding: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb', backgroundColor: '#fafafa' },
+  addCatRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  iconInput: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, width: 48, textAlign: 'center', fontSize: 18,
+  },
+  catNameInput: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, flex: 1, fontSize: 14,
+  },
+  addCatActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  addCatSaveBtn: { backgroundColor: '#2563eb', borderRadius: 6, paddingHorizontal: 16, paddingVertical: 8 },
+  addCatSaveBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  addCatCancelText: { color: '#666', fontSize: 13 },
+  // Form
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 12,
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
+    backgroundColor: '#2563eb', borderRadius: 8, padding: 14, alignItems: 'center',
   },
   buttonText: { color: '#fff', fontWeight: '600' },
   cancel: { textAlign: 'center', color: '#666', marginTop: 12 },
