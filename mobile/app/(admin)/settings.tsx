@@ -69,9 +69,23 @@ export default function SettingsScreen() {
   });
 
   const savePlans = useMutation({
-    mutationFn: () => api.put('/admin/subscription-plans', { plans }),
+    mutationFn: () => {
+      const cleanPlans = plans.map((p) => ({
+        ...(p.id ? { id: p.id } : {}),
+        name: p.name || 'Paket Baru',
+        price: Number(p.price) || 0,
+        periodDays: Math.max(Number(p.periodDays) || 30, 1),
+        active: p.active,
+      }));
+      return api.put('/admin/subscription-plans', { plans: cleanPlans });
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-subscription-plans'] }); Alert.alert('Tersimpan'); },
-    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Gagal menyimpan paket'),
+    onError: (err: any) => {
+      const msg = Array.isArray(err.response?.data?.message)
+        ? err.response.data.message.join('\n')
+        : err.response?.data?.message || 'Gagal menyimpan paket';
+      Alert.alert('Gagal', msg);
+    },
   });
 
   const addPlan = () => {
@@ -126,10 +140,10 @@ export default function SettingsScreen() {
         <View key={index} style={styles.card}>
           <TextInput style={styles.input} placeholder="Nama paket" value={plan.name}
             onChangeText={(v) => updatePlan(index, 'name', v)} />
-          <TextInput style={styles.input} placeholder="Harga (Rp)" value={String(plan.price)}
-            onChangeText={(v) => updatePlan(index, 'price', parseInt(v) || 0)} keyboardType="numeric" />
-          <TextInput style={styles.input} placeholder="Periode (hari)" value={String(plan.periodDays)}
-            onChangeText={(v) => updatePlan(index, 'periodDays', parseInt(v) || 0)} keyboardType="numeric" />
+          <TextInput style={styles.input} placeholder="Harga (Rp)" value={String(plan.price || '')}
+            onChangeText={(v) => updatePlan(index, 'price', v === '' ? 0 : parseInt(v) || 0)} keyboardType="numeric" />
+          <TextInput style={styles.input} placeholder="Periode (hari)" value={String(plan.periodDays || '')}
+            onChangeText={(v) => updatePlan(index, 'periodDays', v === '' ? 0 : parseInt(v) || 0)} keyboardType="numeric" />
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Aktif</Text>
             <Switch value={plan.active} onValueChange={(v) => updatePlan(index, 'active', v)} />
