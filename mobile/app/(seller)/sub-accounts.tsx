@@ -7,45 +7,46 @@ import { useState } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import api from '../../src/lib/api';
 
-interface Account {
+interface SubAccount {
   id: string;
-  email: string;
-  password: string;
+  name: string;
+  pin: string;
   status: string;
-  subAccountCount: number;
   createdAt: string;
 }
 
-export default function AddAccountScreen() {
-  const { durationId, durationLabel } = useLocalSearchParams<{
+export default function SubAccountsScreen() {
+  const { accountId, accountEmail, durationId } = useLocalSearchParams<{
+    accountId: string;
+    accountEmail: string;
     durationId: string;
-    durationLabel: string;
   }>();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [pin, setPin] = useState('');
 
-  const { data: accounts, isLoading } = useQuery<Account[]>({
-    queryKey: ['seller-accounts', durationId],
-    queryFn: () => api.get(`/seller/durations/${durationId}/accounts`).then((r) => r.data),
+  const { data: subAccounts, isLoading } = useQuery<SubAccount[]>({
+    queryKey: ['seller-sub-accounts', accountId],
+    queryFn: () => api.get(`/seller/accounts/${accountId}/sub-accounts`).then((r) => r.data),
   });
 
-  const addAccount = useMutation({
-    mutationFn: () => api.post(`/seller/durations/${durationId}/accounts`, { email, password }),
+  const addSubAccount = useMutation({
+    mutationFn: () => api.post(`/seller/accounts/${accountId}/sub-accounts`, { name, pin }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sub-accounts', accountId] });
       queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
       setShowAdd(false);
-      setEmail('');
-      setPassword('');
+      setName('');
+      setPin('');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
   const handleSubmit = () => {
-    if (!email.trim()) { Alert.alert('Error', 'Email harus diisi'); return; }
-    if (!password.trim()) { Alert.alert('Error', 'Password harus diisi'); return; }
-    addAccount.mutate();
+    if (!name.trim()) { Alert.alert('Error', 'Nama sub-akun harus diisi'); return; }
+    if (!pin.trim()) { Alert.alert('Error', 'PIN harus diisi'); return; }
+    addSubAccount.mutate();
   };
 
   const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : '#f59e0b';
@@ -56,52 +57,47 @@ export default function AddAccountScreen() {
         <Text style={styles.backBtn}>← Kembali</Text>
       </TouchableOpacity>
 
-      <Text style={styles.header}>{durationLabel}</Text>
+      <Text style={styles.header}>Sub-Akun</Text>
+      <Text style={styles.subHeader}>{accountEmail}</Text>
 
       <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
-        <Text style={styles.addBtnText}>+ Tambah Akun</Text>
+        <Text style={styles.addBtnText}>+ Tambah Sub-Akun</Text>
       </TouchableOpacity>
 
       <FlatList
-        data={accounts}
+        data={subAccounts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push({
-              pathname: '/(seller)/sub-accounts',
-              params: { accountId: item.id, accountEmail: item.email, durationId },
-            })}
-          >
+          <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardEmail}>{item.email}</Text>
-                <Text style={styles.cardPass}>{item.password}</Text>
+                <Text style={styles.cardName}>{item.name}</Text>
+                <Text style={styles.cardPin}>PIN: {item.pin}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
                 <Text style={styles.badgeText}>{item.status}</Text>
               </View>
             </View>
             <Text style={styles.cardMeta}>
-              {item.subAccountCount} sub-akun · {new Date(item.createdAt).toLocaleDateString('id-ID')}
+              {new Date(item.createdAt).toLocaleDateString('id-ID')}
             </Text>
-          </TouchableOpacity>
+          </View>
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada akun'}</Text>
+          <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada sub-akun'}</Text>
         }
       />
 
       <Modal visible={showAdd} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Tambah Akun</Text>
-            <TextInput style={styles.input} placeholder="Email" value={email}
-              onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            <TextInput style={styles.input} placeholder="Password" value={password}
-              onChangeText={setPassword} />
-            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={addAccount.isPending}>
-              <Text style={styles.buttonText}>{addAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
+            <Text style={styles.modalTitle}>Tambah Sub-Akun</Text>
+            <TextInput style={styles.input} placeholder="Nama profil / sub-akun"
+              value={name} onChangeText={setName} />
+            <TextInput style={styles.input} placeholder="PIN"
+              value={pin} onChangeText={setPin} keyboardType="numeric" />
+            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={addSubAccount.isPending}>
+              <Text style={styles.buttonText}>{addSubAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowAdd(false)}>
               <Text style={styles.cancel}>Batal</Text>
@@ -116,13 +112,14 @@ export default function AddAccountScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
   backBtn: { fontSize: 15, color: '#2563eb', fontWeight: '600', marginBottom: 12 },
-  header: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-  addBtn: { backgroundColor: '#2563eb', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16 },
+  header: { fontSize: 20, fontWeight: 'bold' },
+  subHeader: { fontSize: 14, color: '#666', marginBottom: 16 },
+  addBtn: { backgroundColor: '#10b981', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardEmail: { fontSize: 15, fontWeight: '600', color: '#111' },
-  cardPass: { fontSize: 13, color: '#666', marginTop: 2 },
+  cardName: { fontSize: 15, fontWeight: '600', color: '#111' },
+  cardPin: { fontSize: 13, color: '#666', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   cardMeta: { fontSize: 12, color: '#888', marginTop: 6 },
@@ -131,7 +128,7 @@ const styles = StyleSheet.create({
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 12 },
-  button: { backgroundColor: '#2563eb', borderRadius: 8, padding: 14, alignItems: 'center' },
+  button: { backgroundColor: '#10b981', borderRadius: 8, padding: 14, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '600' },
   cancel: { textAlign: 'center', color: '#666', marginTop: 12 },
 });
