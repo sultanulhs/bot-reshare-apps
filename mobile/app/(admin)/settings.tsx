@@ -33,6 +33,11 @@ export default function SettingsScreen() {
     queryFn: () => api.get('/admin/subscription-plans').then((r) => r.data),
   });
 
+  const { data: defaultCategories } = useQuery<{ id: string; name: string; icon?: string }[]>({
+    queryKey: ['admin-default-categories'],
+    queryFn: () => api.get('/seller/categories').then((r) => r.data),
+  });
+
   const [markupForm, setMarkupForm] = useState({ markupMode: 'FIXED', markupValue: '0', markupMin: '0', markupMax: '0' });
   const [welcomeText, setWelcomeText] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -162,6 +167,20 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       )}
 
+      <Text style={styles.section}>Kategori Default</Text>
+      <View style={styles.card}>
+        {defaultCategories && defaultCategories.length > 0 ? (
+          defaultCategories.map((cat) => (
+            <View key={cat.id} style={styles.categoryItem}>
+              {cat.icon ? <Text style={styles.categoryIcon}>{cat.icon}</Text> : null}
+              <Text style={styles.categoryName}>{cat.name}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.categoryEmpty}>Belum ada kategori default</Text>
+        )}
+      </View>
+
       <View style={{ height: 48 }} />
     </ScrollView>
   );
@@ -185,4 +204,8 @@ const styles = StyleSheet.create({
   addButton: { borderWidth: 1, borderColor: '#2563eb', borderStyle: 'dashed', borderRadius: 8, padding: 14, alignItems: 'center', marginBottom: 8 },
   addButtonText: { color: '#2563eb', fontWeight: '600' },
   pricePreview: { fontSize: 12, color: '#999', fontStyle: 'italic' },
+  categoryItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  categoryIcon: { fontSize: 18, marginRight: 10 },
+  categoryName: { fontSize: 14, color: '#333' },
+  categoryEmpty: { fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 12 },
 });
