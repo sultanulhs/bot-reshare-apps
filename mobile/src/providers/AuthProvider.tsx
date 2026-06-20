@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { AuthContext, AuthUser } from '../lib/auth';
+import { AuthContext, AuthUser, RegisterData, RegisterResult } from '../lib/auth';
 import api from '../lib/api';
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_URL = 'http://192.168.1.3:3000/api';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -38,16 +38,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.sellerStatus) {
       await SecureStore.setItemAsync('sellerStatus', data.sellerStatus);
     }
-    setUser({
+    const userData: AuthUser = {
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
       role: data.role,
       sellerStatus: data.sellerStatus,
-    });
+    };
+    setUser(userData);
+    return userData;
   }, []);
 
-  const register = useCallback(async (regData: { email: string; password: string; name: string; phone: string }) => {
-    await axios.post(`${API_URL}/auth/register`, regData);
+  const register = useCallback(async (regData: RegisterData): Promise<RegisterResult> => {
+    const { data } = await axios.post(`${API_URL}/auth/register`, regData);
+    return { verifyToken: data.verifyToken };
   }, []);
 
   const logout = useCallback(async () => {

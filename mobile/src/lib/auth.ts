@@ -7,19 +7,32 @@ export interface AuthUser {
   sellerStatus?: string;
 }
 
+export interface RegisterData {
+  email: string;
+  password: string;
+  ownerName: string;
+  storeName: string;
+  phone: string;
+  planId?: string;
+}
+
+export interface RegisterResult {
+  verifyToken: string;
+}
+
 export interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; name: string; phone: string }) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser | undefined>;
+  register: (data: RegisterData) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
-  login: async () => {},
-  register: async () => {},
+  login: async () => undefined,
+  register: async () => ({ verifyToken: '' }),
   logout: async () => {},
 });
 
