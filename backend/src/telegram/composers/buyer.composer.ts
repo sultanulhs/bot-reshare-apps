@@ -16,6 +16,11 @@ export function createBuyerComposer(
     const payload = ctx.match;
     const tgUserId = BigInt(ctx.from!.id);
 
+    // Skip verify_ payloads — handled by seller-verify composer
+    if (payload && payload.startsWith('verify_')) {
+      return;
+    }
+
     if (payload) {
       const seller = await prisma.seller.findUnique({
         where: { storeCode: payload },
@@ -45,7 +50,7 @@ export function createBuyerComposer(
         .text('\u{1F4E6} Pesanan Saya', 'myorders');
 
       await ctx.reply(
-        `${welcomeText}\n\n\u{1F3EA} Toko: ${affiliation.seller.name}\n\nPilih menu di bawah:`,
+        `${welcomeText}\n\n\u{1F3EA} Toko: ${affiliation.seller.storeName}\n\nPilih menu di bawah:`,
         { reply_markup: keyboard },
       );
     } else {
