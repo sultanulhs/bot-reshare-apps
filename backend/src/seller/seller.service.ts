@@ -110,10 +110,11 @@ export class SellerService {
   async updateWarrantyHours(userId: string, hours: number | null) {
     const seller = await this.prisma.seller.findUnique({ where: { userId } });
     if (!seller) throw new NotFoundException('Seller not found');
-    return this.prisma.seller.update({
+    await this.prisma.seller.update({
       where: { id: seller.id },
       data: { warrantyHours: hours },
     });
+    return { success: true, warrantyHours: hours };
   }
 
   async getStoreLink(userId: string) {
