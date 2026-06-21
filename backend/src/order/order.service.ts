@@ -402,10 +402,13 @@ export class OrderService implements OnModuleInit {
       where: { id: orderId },
       data: { warrantyStatus: 'SUBMITTED', warrantyPhoto: fileId, warrantyAt: new Date() },
     });
+    await this.prisma.warrantyPhoto.create({
+      data: { orderId, fileId, status: 'SUBMITTED' },
+    });
     return { success: true };
   }
 
-  async verifyWarranty(sellerId: string, orderId: string, approved: boolean) {
+  async verifyWarranty(sellerId: string, orderId: string, approved: boolean, reason?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { duration: { include: { app: true } } },
@@ -418,11 +421,23 @@ export class OrderService implements OnModuleInit {
       throw new BadRequestException('Warranty is not awaiting verification');
     }
 
+    // Find the latest WarrantyPhoto for this order
+    const latestPhoto = await this.prisma.warrantyPhoto.findFirst({
+      where: { orderId, status: 'SUBMITTED' },
+      orderBy: { createdAt: 'desc' },
+    });
+
     if (approved) {
       await this.prisma.order.update({
         where: { id: orderId },
         data: { warrantyStatus: 'ACTIVE' },
       });
+      if (latestPhoto) {
+        await this.prisma.warrantyPhoto.update({
+          where: { id: latestPhoto.id },
+          data: { status: 'APPROVED' },
+        });
+      }
       try {
         await this.telegramService.bot.api.sendMessage(
           order.buyerTgUserId.toString(),
@@ -430,15 +445,21 @@ export class OrderService implements OnModuleInit {
         );
       } catch {}
     } else {
-      // Reset to PENDING so buyer can re-submit
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { warrantyStatus: 'PENDING', warrantyPhoto: null, warrantyAt: null },
+        data: { warrantyStatus: 'PENDING' },
       });
+      if (latestPhoto) {
+        await this.prisma.warrantyPhoto.update({
+          where: { id: latestPhoto.id },
+          data: { status: 'REJECTED', reason: reason || null },
+        });
+      }
+      const rejectMessage = `\u{274C} Foto garansi ditolak.\n\n\u{1F4DD} Alasan: ${reason || 'Tidak sesuai'}\n\nSilakan kirim ulang foto melalui menu \u{1F6E1}\u{FE0F} Garansi.`;
       try {
         await this.telegramService.bot.api.sendMessage(
           order.buyerTgUserId.toString(),
-          '\u{274C} Foto garansi kamu ditolak. Silakan kirim ulang foto screenshot login yang benar melalui menu \u{1F6E1}\u{FE0F} Garansi.',
+          rejectMessage,
         );
       } catch {}
     }
@@ -469,6 +490,31 @@ export class OrderService implements OnModuleInit {
     if (order.duration?.app?.sellerId !== sellerId) return null;
     const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
     const fileInfo = await this.telegramService.bot.api.getFile(order.warrantyPhoto);
+    return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
+  }
+
+  async getWarrantyPhotos(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order || !order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order not found');
+    }
+    return this.prisma.warrantyPhoto.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async getWarrantyPhotoImageUrl(sellerId: string, photoId: string): Promise<string | null> {
+    const photo = await this.prisma.warrantyPhoto.findUnique({
+      where: { id: photoId },
+      include: { order: { include: { duration: { include: { app: true } } } } },
+    });
+    if (!photo || photo.order.duration?.app?.sellerId !== sellerId) return null;
+    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
+    const fileInfo = await this.telegramService.bot.api.getFile(photo.fileId);
     return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
   }
 

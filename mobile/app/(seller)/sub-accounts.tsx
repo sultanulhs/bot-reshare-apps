@@ -45,14 +45,29 @@ export default function SubAccountsScreen() {
   const [editName, setEditName] = useState('');
   const [editPin, setEditPin] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [photoHistoryOrderId, setPhotoHistoryOrderId] = useState<string | null>(null);
+  const [photoHistory, setPhotoHistory] = useState<Array<{ id: string; fileId: string; status: string; reason: string | null; createdAt: string }>>([]);
+  const [loadingPhotoHistory, setLoadingPhotoHistory] = useState(false);
 
-  const viewWarrantyPhoto = async (orderId: string) => {
+  const viewWarrantyPhoto = async (photoId: string) => {
     try {
-      const res = await api.get(`/seller/orders/${orderId}/warranty-photo`, { responseType: 'arraybuffer' });
+      const res = await api.get(`/seller/warranty-photos/${photoId}/image`, { responseType: 'arraybuffer' });
       const base64 = btoa(String.fromCharCode(...new Uint8Array(res.data)));
       const contentType = res.headers['content-type'] || 'image/jpeg';
       setPhotoUri(`data:${contentType};base64,${base64}`);
     } catch { Alert.alert('Error', 'Gagal memuat foto'); }
+  };
+
+  const openPhotoHistory = async (orderId: string) => {
+    setPhotoHistoryOrderId(orderId);
+    setLoadingPhotoHistory(true);
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/warranty-photos`);
+      setPhotoHistory(res.data);
+    } catch { Alert.alert('Error', 'Gagal memuat riwayat foto'); }
+    setLoadingPhotoHistory(false);
   };
 
   const { data: subAccounts, isLoading, refetch } = useQuery<SubAccount[]>({
@@ -106,10 +121,12 @@ export default function SubAccountsScreen() {
   });
 
   const verifyWarranty = useMutation({
-    mutationFn: ({ orderId, approved }: { orderId: string; approved: boolean }) =>
-      api.post(`/seller/orders/${orderId}/warranty-verify`, { approved }),
+    mutationFn: ({ orderId, approved, reason }: { orderId: string; approved: boolean; reason?: string }) =>
+      api.post(`/seller/orders/${orderId}/warranty-verify`, { approved, reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-sub-accounts', accountId] });
+      setRejectOrderId(null);
+      setRejectReason('');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -202,8 +219,8 @@ export default function SubAccountsScreen() {
                     color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                   }}>
                     {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                    {item.warrantyPhoto && item.orderId && (
-                      <Text onPress={() => viewWarrantyPhoto(item.orderId!)} style={{ color: '#2563eb' }}> 📷 Lihat</Text>
+                    {item.orderId && (
+                      <Text onPress={() => openPhotoHistory(item.orderId!)} style={{ color: '#2563eb' }}> {'\u{1F4F7}'} Riwayat</Text>
                     )}
                   </Text>
                 )}
@@ -216,10 +233,7 @@ export default function SubAccountsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={{ backgroundColor: '#ef4444', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
-                      onPress={() => Alert.alert('Tolak Garansi', 'Yakin ingin menolak? Pembeli bisa kirim ulang foto.', [
-                        { text: 'Batal', style: 'cancel' },
-                        { text: 'Tolak', style: 'destructive', onPress: () => verifyWarranty.mutate({ orderId: item.orderId!, approved: false }) },
-                      ])}>
+                      onPress={() => setRejectOrderId(item.orderId!)}>
                       <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{274C}'} Tolak</Text>
                     </TouchableOpacity>
                   </View>
@@ -282,6 +296,76 @@ export default function SubAccountsScreen() {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowAdd(false)}>
               <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reject Reason Modal */}
+      <Modal visible={!!rejectOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Tolak Garansi</Text>
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>Berikan alasan penolakan (opsional):</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              placeholder="Alasan penolakan..."
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: '#ef4444' }]}
+              onPress={() => { if (rejectOrderId) verifyWarranty.mutate({ orderId: rejectOrderId, approved: false, reason: rejectReason.trim() || undefined }); }}
+              disabled={verifyWarranty.isPending}>
+              <Text style={styles.buttonText}>{verifyWarranty.isPending ? 'Menolak...' : 'Tolak Garansi'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setRejectOrderId(null); setRejectReason(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Photo History Modal */}
+      <Modal visible={!!photoHistoryOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Riwayat Foto Garansi</Text>
+            {loadingPhotoHistory ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Memuat...</Text>
+            ) : photoHistory.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Belum ada foto</Text>
+            ) : (
+              <FlatList
+                data={photoHistory}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item: photo }) => (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                    onPress={() => viewWarrantyPhoto(photo.id)}>
+                    <View style={[
+                      { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+                      { backgroundColor: photo.status === 'SUBMITTED' ? '#3b82f6' : photo.status === 'APPROVED' ? '#16a34a' : '#ef4444' },
+                    ]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: photo.status === 'APPROVED' ? '#16a34a' : photo.status === 'REJECTED' ? '#ef4444' : '#3b82f6' }}>
+                        {photo.status === 'SUBMITTED' ? 'Menunggu' : photo.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                      </Text>
+                      {photo.status === 'REJECTED' && photo.reason && (
+                        <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Alasan: {photo.reason}</Text>
+                      )}
+                      <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                        {new Date(photo.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                      </Text>
+                    </View>
+                    <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Lihat</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity onPress={() => { setPhotoHistoryOrderId(null); setPhotoHistory([]); }}>
+              <Text style={[styles.cancel, { marginTop: 16 }]}>Tutup</Text>
             </TouchableOpacity>
           </View>
         </View>

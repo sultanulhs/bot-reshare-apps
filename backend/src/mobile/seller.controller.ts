@@ -340,9 +340,26 @@ export class SellerController {
   async verifyWarranty(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { approved: boolean },
+    @Body() body: { approved: boolean; reason?: string },
   ) {
-    return this.orderService.verifyWarranty(req.seller.id, id, body.approved);
+    return this.orderService.verifyWarranty(req.seller.id, id, body.approved, body.reason);
+  }
+
+  @Get('orders/:id/warranty-photos')
+  @UseGuards(ActiveSellerGuard)
+  async getWarrantyPhotos(@Req() req: any, @Param('id') id: string) {
+    return this.orderService.getWarrantyPhotos(req.seller.id, id);
+  }
+
+  @Get('warranty-photos/:id/image')
+  @UseGuards(ActiveSellerGuard)
+  async getWarrantyPhotoImage(@Req() req: any, @Param('id') id: string, @Res() res: any) {
+    const photoUrl = await this.orderService.getWarrantyPhotoImageUrl(req.seller.id, id);
+    if (!photoUrl) { res.status(404).json({ message: 'No photo' }); return; }
+    const response = await fetch(photoUrl);
+    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
   }
 
   @Post('store-code')

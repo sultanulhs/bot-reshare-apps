@@ -266,6 +266,7 @@ model Order {
   warrantyAt         DateTime?
   warrantyDeadline   DateTime?
   messages           OrderMessage[]
+  warrantyPhotos     WarrantyPhoto[]
   ledgerEntries      LedgerEntry[]
   reports            Report[]
 }
@@ -276,6 +277,18 @@ model OrderMessage {
   order     Order    @relation(fields: [orderId], references: [id])
   message   String
   createdAt DateTime @default(now())
+}
+
+model WarrantyPhoto {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  fileId    String
+  status    String   // SUBMITTED | APPROVED | REJECTED
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model LedgerEntry {
