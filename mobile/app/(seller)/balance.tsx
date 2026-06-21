@@ -48,34 +48,34 @@ export default function BalanceScreen() {
         <Text style={styles.note}>Pencairan manual (hubungi admin)</Text>
       </View>
 
-      {/* Header: title + year picker inline */}
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
-        <View style={styles.yearPicker}>
-          <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
-            <Text style={styles.yearArrowText}>{'<'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.yearText}>{selectedYear}</Text>
-          <TouchableOpacity onPress={() => setSelectedYear(y => Math.min(y + 1, new Date().getFullYear()))} style={styles.yearArrow}>
-            <Text style={styles.yearArrowText}>{'>'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Month filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {MONTHS.map((m, i) => (
-          <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
-            style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
-            <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       <FlatList
         data={filteredSales}
         keyExtractor={(item: any) => item.orderId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListHeaderComponent={
+          <>
+            <View style={styles.headerRow}>
+              <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
+              <View style={styles.yearPicker}>
+                <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
+                  <Text style={styles.yearArrowText}>{'<'}</Text>
+                </TouchableOpacity>
+                <Text style={styles.yearText}>{selectedYear}</Text>
+                <TouchableOpacity onPress={() => setSelectedYear(y => Math.min(y + 1, new Date().getFullYear()))} style={styles.yearArrow}>
+                  <Text style={styles.yearArrowText}>{'>'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+              {MONTHS.map((m, i) => (
+                <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
+                  style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
+                  <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        }
         renderItem={({ item }: { item: any }) => {
           const statusColors: Record<string, string> = {
             FULFILLED: '#16a34a', PENDING: '#f59e0b', WAITING_SELLER: '#f59e0b',
