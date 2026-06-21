@@ -16,7 +16,29 @@ interface Account {
   subLocked: number;
   subSold: number;
   expiredCount?: number;
+  isExpired?: boolean;
+  buyerTgUserId?: string | null;
+  buyerName?: string | null;
+  buyerUsername?: string | null;
+  buyerInfo?: string | null;
+  orderStatus?: string | null;
+  expiresAt?: string | null;
+  accessExpiresAt?: string | null;
   createdAt: string;
+}
+
+interface ManualOrder {
+  id: string;
+  status: string;
+  buyerName?: string | null;
+  buyerUsername?: string | null;
+  buyerTgUserId: string;
+  buyerInfo?: string | null;
+  totalAmount: number;
+  createdAt: string;
+  fulfilledAt?: string | null;
+  accessExpiresAt?: string | null;
+  expiresAt?: string | null;
 }
 
 export default function AddAccountScreen() {
@@ -34,10 +56,12 @@ export default function AddAccountScreen() {
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
 
-  const { data: accounts, isLoading, refetch } = useQuery<Account[]>({
+  const { data: accountData, isLoading, refetch } = useQuery<{ accounts: Account[]; manualOrders: ManualOrder[] }>({
     queryKey: ['seller-accounts', durationId],
     queryFn: () => api.get(`/seller/durations/${durationId}/accounts`).then((r) => r.data),
   });
+  const accounts = accountData?.accounts ?? [];
+  const manualOrders = accountData?.manualOrders ?? [];
 
   const handleBack = useCallback(() => {
     router.push({ pathname: '/(seller)/app-detail', params: { appId: appId!, appName: appName || '' } });
@@ -155,13 +179,31 @@ export default function AddAccountScreen() {
                 <Text style={styles.badgeText}>{item.status}</Text>
               </View>
             </View>
+            {/* Buyer info for accounts without sub-accounts */}
+            {item.buyerTgUserId && (item.subAvailable + item.subLocked + item.subSold === 0) && (item.status === 'SOLD' || item.status === 'LOCKED') && (
+              <Text style={item.isExpired ? styles.buyerExpired : item.status === 'LOCKED' ? styles.buyerLocked : styles.buyerActive}>
+                {item.status === 'LOCKED' ? '🔒 Menunggu Bayar' : item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {
+                  item.buyerName ? `${item.buyerName}${item.buyerUsername ? ` (@${item.buyerUsername})` : ''}` : `@${item.buyerTgUserId}`
+                }
+              </Text>
+            )}
+            {item.status === 'LOCKED' && item.expiresAt && (item.subAvailable + item.subLocked + item.subSold === 0) && (
+              <Text style={styles.expiryDate}>⏰ Batas bayar: {new Date(item.expiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</Text>
+            )}
+            {item.accessExpiresAt && item.status === 'SOLD' && (item.subAvailable + item.subLocked + item.subSold === 0) && (
+              <Text style={styles.expiryDate}>Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</Text>
+            )}
             {(item.expiredCount ?? 0) > 0 && (
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
             )}
             <View style={styles.cardFooter}>
-              <Text style={styles.cardMeta}>
-                Sub-akun: {item.subAvailable} tersedia | {item.subLocked} terkunci | {item.subSold} terjual
-              </Text>
+              {(item.subAvailable + item.subLocked + item.subSold > 0) ? (
+                <Text style={styles.cardMeta}>
+                  Sub-akun: {item.subAvailable} tersedia | {item.subLocked} terkunci | {item.subSold} terjual
+                </Text>
+              ) : (
+                <Text style={styles.cardMeta}>Akun tanpa sub-akun</Text>
+              )}
               <View style={styles.actionRow}>
                 <TouchableOpacity onPress={() => handleEditAccount(item)} style={styles.actionBtn}>
                   <Text style={styles.editBtnText}>Edit</Text>
@@ -177,6 +219,43 @@ export default function AddAccountScreen() {
           <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada akun'}</Text>
         }
       />
+
+      {/* Manual Orders Section */}
+      {manualOrders.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Pesanan Manual</Text>
+          {manualOrders.map((order) => {
+            const statusColors: Record<string, string> = {
+              FULFILLED: '#16a34a', PENDING: '#f59e0b', WAITING_SELLER: '#f59e0b',
+              EXPIRED: '#ef4444', FAILED: '#ef4444',
+            };
+            const buyerLabel = order.buyerName
+              ? `${order.buyerName}${order.buyerUsername ? ` (@${order.buyerUsername})` : ''}`
+              : `@${order.buyerTgUserId}`;
+            const fmtDate = (d: string) => new Date(d).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+            return (
+              <View key={order.id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: statusColors[order.status] || '#999' }]}>
+                <View style={styles.cardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardEmail}>👤 {buyerLabel}</Text>
+                    {order.buyerInfo && <Text style={styles.cardPass}>📋 {order.buyerInfo}</Text>}
+                  </View>
+                  <View style={[styles.badge, { backgroundColor: statusColors[order.status] || '#999' }]}>
+                    <Text style={styles.badgeText}>{order.status}</Text>
+                  </View>
+                </View>
+                <Text style={styles.cardMeta}>💰 Rp{order.totalAmount.toLocaleString('id-ID')}</Text>
+                <Text style={styles.cardMeta}>📅 {fmtDate(order.createdAt)}</Text>
+                {order.fulfilledAt && <Text style={styles.cardMeta}>✅ Selesai: {fmtDate(order.fulfilledAt)}</Text>}
+                {order.accessExpiresAt && <Text style={styles.cardMeta}>⏰ Berlaku s/d: {fmtDate(order.accessExpiresAt)}</Text>}
+                {(order.status === 'PENDING' || order.status === 'EXPIRED') && order.expiresAt && (
+                  <Text style={styles.cardMeta}>{order.status === 'PENDING' ? '⏰ Batas bayar' : '❌ Expired'}: {fmtDate(order.expiresAt)}</Text>
+                )}
+              </View>
+            );
+          })}
+        </>
+      )}
 
       {/* Modal Edit Akun */}
       <Modal visible={!!editingAccount} animationType="slide" transparent>
@@ -227,6 +306,11 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
+  buyerLocked: { color: '#f59e0b', fontSize: 12, marginTop: 4 },
+  buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  expiryDate: { color: '#999', fontSize: 11, marginTop: 2 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 16, marginBottom: 8 },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardEmail: { fontSize: 15, fontWeight: '600', color: '#111' },

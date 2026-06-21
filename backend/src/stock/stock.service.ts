@@ -96,6 +96,12 @@ export class StockService {
       where: { durationId, deletedAt: null },
       include: {
         subAccounts: { where: { deletedAt: null }, select: { status: true } },
+        order: {
+          select: {
+            buyerTgUserId: true, buyerName: true, buyerUsername: true,
+            buyerInfo: true, status: true, expiresAt: true, accessExpiresAt: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -113,6 +119,12 @@ export class StockService {
             ],
           },
         });
+        const isExpired = !!(
+          a.order &&
+          a.order.status === 'FULFILLED' &&
+          a.order.accessExpiresAt &&
+          a.order.accessExpiresAt <= now
+        );
         return {
           id: a.id,
           email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
@@ -122,11 +134,40 @@ export class StockService {
           subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
           subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
           expiredCount: expiredOrders,
+          isExpired,
+          buyerTgUserId: a.order?.buyerTgUserId?.toString() || null,
+          buyerName: a.order?.buyerName || null,
+          buyerUsername: a.order?.buyerUsername || null,
+          buyerInfo: a.order?.buyerInfo || null,
+          orderStatus: a.order?.status || null,
+          expiresAt: a.order?.expiresAt || null,
+          accessExpiresAt: a.order?.accessExpiresAt || null,
           createdAt: a.createdAt,
         };
       }),
     );
-    return accountsWithExpired;
+
+    // MANUAL orders for this duration
+    const manualOrders = duration.productType === 'MANUAL'
+      ? (await this.prisma.order.findMany({
+          where: { durationId },
+          orderBy: { createdAt: 'desc' },
+        })).map((o) => ({
+          id: o.id,
+          status: o.status,
+          buyerName: o.buyerName,
+          buyerUsername: o.buyerUsername,
+          buyerTgUserId: o.buyerTgUserId.toString(),
+          buyerInfo: o.buyerInfo,
+          totalAmount: o.totalAmount,
+          createdAt: o.createdAt,
+          fulfilledAt: o.fulfilledAt,
+          accessExpiresAt: o.accessExpiresAt,
+          expiresAt: o.expiresAt,
+        }))
+      : [];
+
+    return { accounts: accountsWithExpired, manualOrders };
   }
 
   async listSubAccounts(accountId: string) {
