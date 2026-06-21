@@ -99,8 +99,9 @@ export class StockService {
         subAccounts: { where: { deletedAt: null }, select: { status: true } },
         order: {
           select: {
-            buyerTgUserId: true, buyerName: true, buyerUsername: true,
+            id: true, buyerTgUserId: true, buyerName: true, buyerUsername: true,
             buyerInfo: true, status: true, expiresAt: true, accessExpiresAt: true,
+            warrantyStatus: true, warrantyPhoto: true, warrantyAt: true, warrantyDeadline: true,
           },
         },
       },
@@ -142,8 +143,13 @@ export class StockService {
           buyerUsername: a.order?.buyerUsername || null,
           buyerInfo: a.order?.buyerInfo || null,
           orderStatus: a.order?.status || null,
+          orderId: a.order?.id || null,
           expiresAt: a.order?.expiresAt || null,
           accessExpiresAt: a.order?.accessExpiresAt || null,
+          warrantyStatus: a.order?.warrantyStatus || null,
+          warrantyPhoto: !!a.order?.warrantyPhoto,
+          warrantyAt: a.order?.warrantyAt || null,
+          warrantyDeadline: a.order?.warrantyDeadline || null,
           createdAt: a.createdAt,
         };
       }),
@@ -167,6 +173,10 @@ export class StockService {
           accessExpiresAt: o.accessExpiresAt,
           expiresAt: o.expiresAt,
           reminderEnabled: o.reminderEnabled,
+          warrantyStatus: o.warrantyStatus,
+          warrantyPhoto: !!o.warrantyPhoto,
+          warrantyAt: o.warrantyAt,
+          warrantyDeadline: o.warrantyDeadline,
         }))
       : [];
 
@@ -179,6 +189,7 @@ export class StockService {
       include: {
         order: {
           select: {
+            id: true,
             buyerTgUserId: true,
             buyerName: true,
             buyerUsername: true,
@@ -186,6 +197,10 @@ export class StockService {
             status: true,
             expiresAt: true,
             accessExpiresAt: true,
+            warrantyStatus: true,
+            warrantyPhoto: true,
+            warrantyAt: true,
+            warrantyDeadline: true,
           },
         },
       },
@@ -211,8 +226,13 @@ export class StockService {
         buyerUsername: s.order?.buyerUsername || null,
         buyerInfo: s.order?.buyerInfo || null,
         orderStatus: s.order?.status || null,
+        orderId: s.order?.id || null,
         expiresAt: s.order?.expiresAt || null,
         accessExpiresAt: s.order?.accessExpiresAt || null,
+        warrantyStatus: s.order?.warrantyStatus || null,
+        warrantyPhoto: !!s.order?.warrantyPhoto,
+        warrantyAt: s.order?.warrantyAt || null,
+        warrantyDeadline: s.order?.warrantyDeadline || null,
         createdAt: s.createdAt,
       };
     });

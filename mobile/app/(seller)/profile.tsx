@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl, Clipboard } from 'react-native';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
@@ -23,6 +23,31 @@ export default function ProfileScreen() {
   const [storeCodeInput, setStoreCodeInput] = useState('');
   const [storeCodeLoading, setStoreCodeLoading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [warrantyHours, setWarrantyHours] = useState('');
+
+  useEffect(() => {
+    if (me?.warrantyHours !== undefined) {
+      setWarrantyHours(me.warrantyHours ? String(me.warrantyHours) : '');
+    }
+  }, [me?.warrantyHours]);
+
+  const saveWarranty = useMutation({
+    mutationFn: (hours: number | null) => api.patch('/seller/warranty', { hours }),
+    onSuccess: () => {
+      Alert.alert('Berhasil', 'Pengaturan garansi disimpan');
+      refetchMe();
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const handleSaveWarranty = () => {
+    const hours = warrantyHours.trim() ? parseInt(warrantyHours.trim(), 10) : null;
+    if (hours !== null && (isNaN(hours) || hours < 1)) {
+      Alert.alert('Error', 'Masukkan jumlah jam yang valid (minimal 1)');
+      return;
+    }
+    saveWarranty.mutate(hours);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -228,6 +253,30 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
+      </View>
+
+      {/* Garansi */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Garansi</Text>
+        <Text style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+          Atur batas waktu (jam) bagi pembeli untuk mengirim screenshot login. Kosongkan untuk menonaktifkan garansi.
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Contoh: 24"
+          value={warrantyHours}
+          onChangeText={setWarrantyHours}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveWarranty}
+          disabled={saveWarranty.isPending}
+        >
+          <Text style={styles.saveButtonText}>
+            {saveWarranty.isPending ? 'Menyimpan...' : 'Simpan Garansi'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Logout */}

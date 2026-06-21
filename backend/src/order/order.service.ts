@@ -5,6 +5,7 @@ import {
   Logger,
   OnModuleInit,
   forwardRef,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -37,6 +38,7 @@ export class OrderService implements OnModuleInit {
     private readonly config: ConfigService,
     @InjectQueue('order-expiry') private readonly expiryQueue: Queue,
     @InjectQueue('manual-reminder') private readonly reminderQueue: Queue,
+    @InjectQueue('warranty-expiry') private readonly warrantyQueue: Queue,
     private readonly cryptoService: CryptoService,
     @Inject(forwardRef(() => TelegramService))
     private readonly telegramService: TelegramService,
@@ -329,6 +331,9 @@ export class OrderService implements OnModuleInit {
         `Failed to send credentials to buyer ${order.buyerTgUserId}: ${err.message}`,
       );
     }
+
+    // Setup warranty if seller has it configured
+    await this.setupWarranty(orderId, sellerId, fulfilledAt);
   }
 
   async sendMessageToBuyer(sellerId: string, orderId: string, message: string) {
@@ -380,5 +385,71 @@ export class OrderService implements OnModuleInit {
       where: { orderId },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async submitWarrantyPhoto(buyerTgUserId: bigint, orderId: string, fileId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.buyerTgUserId !== buyerTgUserId) {
+      throw new BadRequestException('Order not found');
+    }
+    if (order.warrantyStatus !== 'PENDING') {
+      throw new BadRequestException('Warranty is not pending');
+    }
+    if (order.warrantyDeadline && order.warrantyDeadline < new Date()) {
+      throw new BadRequestException('Warranty deadline has passed');
+    }
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { warrantyStatus: 'ACTIVE', warrantyPhoto: fileId, warrantyAt: new Date() },
+    });
+    return { success: true };
+  }
+
+  async expireWarranty(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.warrantyStatus !== 'PENDING') return;
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { warrantyStatus: 'EXPIRED' },
+    });
+    try {
+      await this.telegramService.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        '❌ Garansi pesanan kamu telah hangus karena tidak mengirim foto login dalam batas waktu.',
+      );
+    } catch {}
+  }
+
+  async getWarrantyPhotoUrl(sellerId: string, orderId: string): Promise<string | null> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order || !order.warrantyPhoto) return null;
+    if (order.duration?.app?.sellerId !== sellerId) return null;
+    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
+    const fileInfo = await this.telegramService.bot.api.getFile(order.warrantyPhoto);
+    return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
+  }
+
+  async setupWarranty(orderId: string, sellerId: string, fulfilledAt: Date) {
+    const seller = await this.prisma.seller.findUnique({ where: { id: sellerId } });
+    if (!seller?.warrantyHours) return;
+
+    const warrantyDeadline = new Date(fulfilledAt.getTime() + seller.warrantyHours * 3600000);
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { warrantyStatus: 'PENDING', warrantyDeadline },
+    });
+
+    await this.warrantyQueue.add('expire', { orderId }, { delay: seller.warrantyHours * 3600000 });
+
+    try {
+      await this.telegramService.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        `📸 *Aktivasi Garansi*\n\nKirim screenshot login dalam ${seller.warrantyHours} jam untuk mengaktifkan garansi.\n\nGunakan menu 🛡️ Garansi di bot.`,
+        { parse_mode: 'Markdown' },
+      );
+    } catch {}
   }
 }

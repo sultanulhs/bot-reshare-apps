@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
@@ -309,6 +310,22 @@ export class SellerController {
     const seller = await this.sellerService.getStatus(req.user.sub);
     await this.verificationService.verifyPhoneOtp(seller.id, body.code);
     return { message: 'Nomor telepon berhasil diverifikasi' };
+  }
+
+  @Patch('warranty')
+  async updateWarranty(@Req() req: any, @Body() body: { hours: number | null }) {
+    return this.sellerService.updateWarrantyHours(req.user.sub, body.hours);
+  }
+
+  @Get('orders/:id/warranty-photo')
+  @UseGuards(ActiveSellerGuard)
+  async getWarrantyPhoto(@Req() req: any, @Param('id') id: string, @Res() res: any) {
+    const photoUrl = await this.orderService.getWarrantyPhotoUrl(req.seller.id, id);
+    if (!photoUrl) { res.status(404).json({ message: 'No photo' }); return; }
+    const response = await fetch(photoUrl);
+    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
   }
 
   @Post('store-code')

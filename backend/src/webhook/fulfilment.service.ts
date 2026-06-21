@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class FulfilmentService {
@@ -14,6 +16,7 @@ export class FulfilmentService {
     @Inject(forwardRef(() => TelegramService))
     private readonly telegram: TelegramService,
     private readonly subscriptionService: SubscriptionService,
+    @InjectQueue('warranty-expiry') private readonly warrantyQueue: Queue,
   ) {}
 
   async handlePaymentNotification(body: {
@@ -159,6 +162,24 @@ export class FulfilmentService {
       );
     } catch (err: any) {
       this.logger.error(`Failed to send credentials to buyer: ${err.message}`);
+    }
+
+    // Setup warranty if seller has it configured
+    const sellerData = await this.prisma.seller.findUnique({ where: { id: sellerId } });
+    if (sellerData?.warrantyHours) {
+      const warrantyDeadline = new Date(fulfilledAt.getTime() + sellerData.warrantyHours * 3600000);
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { warrantyStatus: 'PENDING', warrantyDeadline },
+      });
+      await this.warrantyQueue.add('expire', { orderId: order.id }, { delay: sellerData.warrantyHours * 3600000 });
+      try {
+        await this.telegram.bot.api.sendMessage(
+          order.buyerTgUserId.toString(),
+          `📸 *Aktivasi Garansi*\n\nKirim screenshot login dalam ${sellerData.warrantyHours} jam untuk mengaktifkan garansi.\n\nGunakan menu 🛡️ Garansi di bot.`,
+          { parse_mode: 'Markdown' },
+        );
+      } catch {}
     }
 
     this.logger.log(`Order ${order.id} fulfilled (AKUN_READY)`);

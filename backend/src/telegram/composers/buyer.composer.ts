@@ -9,6 +9,8 @@ const isTestPayEnabled = process.env.TEST_PAYMENT_ENABLED === 'true';
 
 // In-memory state for MANUAL orders awaiting buyer info
 const pendingManualOrders = new Map<string, { durationId: string; sellerId: string }>();
+// In-memory state for warranty photo uploads
+const pendingWarrantyPhotos = new Map<string, string>(); // tgUserId -> orderId
 
 export function createBuyerComposer(
   prisma: PrismaService,
@@ -54,7 +56,9 @@ export function createBuyerComposer(
       const keyboard = new InlineKeyboard()
         .text('\u{1F4CB} Lihat Kategori', 'catalog')
         .row()
-        .text('\u{1F4E6} Pesanan Saya', 'myorders');
+        .text('\u{1F4E6} Pesanan Saya', 'myorders')
+        .row()
+        .text('\u{1F6E1}\u{FE0F} Garansi', 'warranty');
 
       await ctx.reply(
         `${welcomeText}\n\n\u{1F3EA} Toko: ${affiliation.seller.storeName}\n\nPilih menu di bawah:`,
@@ -443,6 +447,55 @@ export function createBuyerComposer(
     await ctx.reply(
       '✅ Laporan Anda telah dikirim ke penjual. Kami akan memproses segera.',
     );
+  });
+
+  // Warranty — list pending warranty orders
+  composer.callbackQuery('warranty', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const tgUserId = BigInt(ctx.from.id);
+    const orders = await prisma.order.findMany({
+      where: { buyerTgUserId: tgUserId, warrantyStatus: 'PENDING' },
+      include: { duration: { include: { app: { include: { template: true } } } } },
+    });
+    if (orders.length === 0) {
+      await ctx.reply('\u{2705} Tidak ada pesanan yang memerlukan aktivasi garansi.');
+      return;
+    }
+    const keyboard = new InlineKeyboard();
+    for (const o of orders) {
+      const name = o.duration?.app?.template?.name ?? 'Pesanan';
+      keyboard.text(`\u{1F4F8} ${name}`, `warranty_${o.id}`).row();
+    }
+    await ctx.reply('\u{1F6E1}\u{FE0F} *Aktivasi Garansi*\n\nPilih pesanan untuk mengirim screenshot login:', {
+      reply_markup: keyboard, parse_mode: 'Markdown',
+    });
+  });
+
+  // Warranty — select order and prompt for photo
+  composer.callbackQuery(/^warranty_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const orderId = ctx.match![1];
+    pendingWarrantyPhotos.set(ctx.from.id.toString(), orderId);
+    await ctx.reply('\u{1F4F8} Kirim foto screenshot login kamu sekarang.\n\n_Pastikan foto menunjukkan halaman utama setelah login._', { parse_mode: 'Markdown' });
+  });
+
+  // Warranty — handle photo upload
+  composer.on('message:photo', async (ctx) => {
+    const tgUserId = ctx.from.id.toString();
+    const orderId = pendingWarrantyPhotos.get(tgUserId);
+    if (!orderId) return;
+    pendingWarrantyPhotos.delete(tgUserId);
+
+    const photos = ctx.message.photo;
+    const largestPhoto = photos[photos.length - 1];
+    const fileId = largestPhoto.file_id;
+
+    try {
+      await orderService.submitWarrantyPhoto(BigInt(ctx.from.id), orderId, fileId);
+      await ctx.reply('\u{2705} Garansi berhasil diaktifkan! Screenshot login kamu telah tersimpan.');
+    } catch (err: any) {
+      await ctx.reply(`\u{274C} Gagal aktivasi garansi: ${err.message}`);
+    }
   });
 
   // Handle text replies for MANUAL orders (buyer info input)

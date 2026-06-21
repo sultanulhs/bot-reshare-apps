@@ -93,6 +93,7 @@ model Seller {
   tgUserId             BigInt?               @unique
   storeCode            String?               @unique
   status               SellerStatus          @default(PENDING)
+  warrantyHours        Int?
   categories           Category[]
   apps                 App[]
   appTemplates         AppTemplate[]
@@ -260,6 +261,10 @@ model Order {
   fulfilledAt        DateTime?
   accessExpiresAt    DateTime?
   reminderEnabled    Boolean       @default(false)
+  warrantyStatus     String?
+  warrantyPhoto      String?
+  warrantyAt         DateTime?
+  warrantyDeadline   DateTime?
   messages           OrderMessage[]
   ledgerEntries      LedgerEntry[]
   reports            Report[]

@@ -35,6 +35,7 @@ export class SellerService {
       storeCode: seller.storeCode,
       emailVerified: seller.user.emailVerified,
       phoneVerified: seller.phoneVerified,
+      warrantyHours: seller.warrantyHours,
     };
   }
 
@@ -104,6 +105,15 @@ export class SellerService {
       data: { storeCode },
     });
     return { storeCode };
+  }
+
+  async updateWarrantyHours(userId: string, hours: number | null) {
+    const seller = await this.prisma.seller.findUnique({ where: { userId } });
+    if (!seller) throw new NotFoundException('Seller not found');
+    return this.prisma.seller.update({
+      where: { id: seller.id },
+      data: { warrantyHours: hours },
+    });
   }
 
   async getStoreLink(userId: string) {

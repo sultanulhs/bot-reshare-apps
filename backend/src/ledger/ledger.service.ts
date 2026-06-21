@@ -48,6 +48,7 @@ export class LedgerService {
       expiresAt: o.expiresAt,
       fulfilledAt: o.fulfilledAt,
       accessExpiresAt: o.accessExpiresAt,
+      warrantyStatus: o.warrantyStatus,
     }));
   }
 }

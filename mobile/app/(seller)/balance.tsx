@@ -134,6 +134,14 @@ export default function BalanceScreen() {
               {item.accessExpiresAt && item.status === 'FULFILLED' && (
                 <Text style={styles.cardDate}>⏰ Berlaku s/d: {fmtDate(item.accessExpiresAt)}</Text>
               )}
+              {item.warrantyStatus && (
+                <Text style={{
+                  fontSize: 11, marginTop: 2, fontWeight: '600',
+                  color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                }}>
+                  {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu' : '\u{274C} Garansi Hangus'}
+                </Text>
+              )}
             </View>
           );
         }}

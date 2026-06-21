@@ -18,8 +18,13 @@ interface SubAccount {
   buyerUsername?: string | null;
   buyerInfo?: string | null;
   orderStatus?: string | null;
+  orderId?: string | null;
   expiresAt?: string | null;
   accessExpiresAt?: string | null;
+  warrantyStatus?: string | null;
+  warrantyPhoto?: boolean;
+  warrantyAt?: string | null;
+  warrantyDeadline?: string | null;
   createdAt: string;
 }
 
@@ -170,6 +175,15 @@ export default function SubAccountsScreen() {
                 {item.accessExpiresAt && item.status === 'SOLD' && (
                   <Text style={styles.expiryDate}>
                     Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                  </Text>
+                )}
+                {item.warrantyStatus && (
+                  <Text style={{
+                    fontSize: 12, marginTop: 4, fontWeight: '600',
+                    color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                  }}>
+                    {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
+                    {item.warrantyPhoto && item.orderId && ' \u{1F4F8}'}
                   </Text>
                 )}
               </View>
