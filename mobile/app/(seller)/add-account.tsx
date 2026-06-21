@@ -59,6 +59,7 @@ export default function AddAccountScreen() {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [editHasSubAccounts, setEditHasSubAccounts] = useState(true);
 
   const { data: accountData, isLoading, refetch } = useQuery<{ accounts: Account[]; manualOrders: ManualOrder[] }>({
     queryKey: ['seller-accounts', durationId],
@@ -129,6 +130,7 @@ export default function AddAccountScreen() {
     setEditingAccount(account);
     setEditEmail(account.email);
     setEditPassword(account.password);
+    setEditHasSubAccounts(account.hasSubAccounts);
   };
 
   const handleEditSubmit = () => {
@@ -137,7 +139,7 @@ export default function AddAccountScreen() {
     if (!editPassword.trim()) { Alert.alert('Error', 'Password harus diisi'); return; }
     updateAccount.mutate({
       id: editingAccount.id,
-      data: { email: editEmail.trim(), password: editPassword.trim() },
+      data: { email: editEmail.trim(), password: editPassword.trim(), hasSubAccounts: editHasSubAccounts },
     });
   };
 
@@ -281,6 +283,10 @@ export default function AddAccountScreen() {
               onChangeText={setEditEmail} keyboardType="email-address" autoCapitalize="none" />
             <TextInput style={styles.input} placeholder="Password" value={editPassword}
               onChangeText={setEditPassword} />
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Memiliki Sub-Akun</Text>
+              <Switch value={editHasSubAccounts} onValueChange={setEditHasSubAccounts} />
+            </View>
             <TouchableOpacity style={styles.button} onPress={handleEditSubmit} disabled={updateAccount.isPending}>
               <Text style={styles.buttonText}>{updateAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
             </TouchableOpacity>

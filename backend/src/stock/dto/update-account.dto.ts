@@ -1,6 +1,7 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class UpdateAccountDto {
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() password?: string;
+  @IsOptional() @IsBoolean() hasSubAccounts?: boolean;
 }

@@ -238,6 +238,9 @@ export class StockService {
       data.passwordIv = enc.iv;
       data.passwordTag = enc.authTag;
     }
+    if (dto.hasSubAccounts !== undefined) {
+      data.hasSubAccounts = dto.hasSubAccounts;
+    }
 
     const updated = await this.prisma.account.update({ where: { id }, data });
 
