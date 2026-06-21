@@ -70,6 +70,9 @@ export default function BalanceScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <View style={styles.dateFilterRow}>
         <View style={styles.yearPicker}>
           <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
             <Text style={styles.yearArrowText}>{'<'}</Text>
@@ -79,16 +82,15 @@ export default function BalanceScreen() {
             <Text style={styles.yearArrowText}>{'>'}</Text>
           </TouchableOpacity>
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          {MONTHS.map((m, i) => (
+            <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
+              style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
+              <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {MONTHS.map((m, i) => (
-          <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
-            style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
-            <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       <FlatList
         style={{ flex: 1 }}
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
   yearArrow: { paddingHorizontal: 10, paddingVertical: 4 },
   yearArrowText: { fontSize: 16, fontWeight: '700', color: '#2563eb' },
   yearText: { fontSize: 15, fontWeight: '700', color: '#1e293b', marginHorizontal: 4 },
-  filterRow: { flexDirection: 'row', marginBottom: 10, flexGrow: 0 },
+  dateFilterRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
   monthChip: { backgroundColor: '#f3f4f6', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, minWidth: 48, alignItems: 'center' as const },
   monthChipActive: { backgroundColor: '#2563eb' },
   monthChipText: { fontSize: 15, color: '#1e293b', fontWeight: '600' },
