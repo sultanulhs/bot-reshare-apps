@@ -100,7 +100,7 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const cat of filtered) {
       const stock = catStock.get(cat.id) ?? 0;
-      const stockLabel = stock > 0 ? ` (${stock} tersedia)` : ' (Habis)';
+      const stockLabel = stock > 0 ? ' ✅' : ' (Habis)';
       keyboard
         .text(`${cat.icon ?? ''} ${cat.name}${stockLabel}`.trim(), `cat_${cat.id}`)
         .row();
