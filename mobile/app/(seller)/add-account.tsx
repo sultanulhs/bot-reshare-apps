@@ -15,6 +15,7 @@ interface Account {
   subAvailable: number;
   subLocked: number;
   subSold: number;
+  expiredCount?: number;
   createdAt: string;
 }
 
@@ -139,7 +140,7 @@ export default function AddAccountScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
             onPress={() => router.push({
               pathname: '/(seller)/sub-accounts',
               params: { accountId: item.id, accountEmail: item.email, durationId, durationLabel, appId: appId!, appName: appName || '' },
@@ -154,6 +155,9 @@ export default function AddAccountScreen() {
                 <Text style={styles.badgeText}>{item.status}</Text>
               </View>
             </View>
+            {(item.expiredCount ?? 0) > 0 && (
+              <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
+            )}
             <View style={styles.cardFooter}>
               <Text style={styles.cardMeta}>
                 Sub-akun: {item.subAvailable} tersedia | {item.subLocked} terkunci | {item.subSold} terjual
@@ -222,6 +226,8 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#2563eb', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
+  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardEmail: { fontSize: 15, fontWeight: '600', color: '#111' },
   cardPass: { fontSize: 13, color: '#666', marginTop: 2 },

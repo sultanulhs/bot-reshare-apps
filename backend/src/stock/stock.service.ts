@@ -86,16 +86,30 @@ export class StockService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return accounts.map((a) => ({
-      id: a.id,
-      email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
-      password: this.crypto.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
-      status: a.status,
-      subAvailable: a.subAccounts.filter((s) => s.status === 'AVAILABLE').length,
-      subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
-      subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
-      createdAt: a.createdAt,
-    }));
+    const now = new Date();
+    const accountsWithExpired = await Promise.all(
+      accounts.map(async (a) => {
+        const expiredOrders = await this.prisma.order.count({
+          where: {
+            accountId: a.id,
+            status: 'FULFILLED',
+            accessExpiresAt: { lte: now },
+          },
+        });
+        return {
+          id: a.id,
+          email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
+          password: this.crypto.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
+          status: a.status,
+          subAvailable: a.subAccounts.filter((s) => s.status === 'AVAILABLE').length,
+          subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
+          subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
+          expiredCount: expiredOrders,
+          createdAt: a.createdAt,
+        };
+      }),
+    );
+    return accountsWithExpired;
   }
 
   async listSubAccounts(accountId: string) {
@@ -104,13 +118,27 @@ export class StockService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return subAccounts.map((s) => ({
-      id: s.id,
-      name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
-      pin: this.crypto.decrypt(s.encPin, s.pinIv, s.pinTag),
-      status: s.status,
-      createdAt: s.createdAt,
-    }));
+    const now = new Date();
+    const subAccountsWithExpired = await Promise.all(
+      subAccounts.map(async (s) => {
+        const expiredOrder = await this.prisma.order.findFirst({
+          where: {
+            subAccountId: s.id,
+            status: 'FULFILLED',
+            accessExpiresAt: { lte: now },
+          },
+        });
+        return {
+          id: s.id,
+          name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
+          pin: this.crypto.decrypt(s.encPin, s.pinIv, s.pinTag),
+          status: s.status,
+          isExpired: !!expiredOrder,
+          createdAt: s.createdAt,
+        };
+      }),
+    );
+    return subAccountsWithExpired;
   }
 
   async updateAccount(sellerId: string, id: string, dto: UpdateAccountDto) {

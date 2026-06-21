@@ -28,6 +28,7 @@ interface Duration {
   stockAvailable?: number;
   stockLocked?: number;
   stockSold?: number;
+  expiredCount?: number;
 }
 
 interface AppDetail {
@@ -236,7 +237,7 @@ export default function AppDetailScreen() {
         )}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
             onPress={() =>
               router.push({
                 pathname: '/(seller)/add-account',
@@ -266,6 +267,9 @@ export default function AppDetailScreen() {
             <Text style={styles.cardStock}>
               Tersedia: {item.stockAvailable ?? 0} | Terkunci: {item.stockLocked ?? 0} | Terjual: {item.stockSold ?? 0}
             </Text>
+            {(item.expiredCount ?? 0) > 0 && (
+              <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
+            )}
           </TouchableOpacity>
         )}
         ListEmptyComponent={
@@ -427,6 +431,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     elevation: 1,
   },
+  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   actionRow: { flexDirection: 'row', gap: 8 },

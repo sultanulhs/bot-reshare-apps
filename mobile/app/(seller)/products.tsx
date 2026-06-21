@@ -29,6 +29,7 @@ interface App {
   stockAvailable?: number;
   stockLocked?: number;
   stockSold?: number;
+  expiredCount?: number;
 }
 
 export default function ProductsScreen() {
@@ -237,9 +238,10 @@ export default function ProductsScreen() {
           const stockAvailable = item.stockAvailable ?? 0;
           const stockLocked = item.stockLocked ?? 0;
           const stockSold = item.stockSold ?? 0;
+          const expiredCount = item.expiredCount ?? 0;
           return (
             <TouchableOpacity
-              style={[styles.card, !item.active && styles.cardInactive]}
+              style={[styles.card, !item.active && styles.cardInactive, expiredCount > 0 && styles.cardExpired]}
               onPress={() =>
                 router.push({
                   pathname: '/(seller)/app-detail',
@@ -262,6 +264,9 @@ export default function ProductsScreen() {
               <Text style={styles.cardStock}>
                 Tersedia: {stockAvailable} | Terkunci: {stockLocked} | Terjual: {stockSold}
               </Text>
+              {expiredCount > 0 && (
+                <Text style={styles.expiredBadge}>{expiredCount} kadaluarsa</Text>
+              )}
             </TouchableOpacity>
           );
         }}
@@ -612,6 +617,8 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardInactive: { opacity: 0.5 },
+  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   cardNotes: { fontSize: 12, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },

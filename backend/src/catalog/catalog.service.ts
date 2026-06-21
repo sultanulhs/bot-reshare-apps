@@ -102,6 +102,13 @@ export class CatalogService {
         const accountCount = await this.prisma.account.count({
           where: { deletedAt: null, duration: { appId: app.id, deletedAt: null } },
         });
+        const expiredCount = await this.prisma.order.count({
+          where: {
+            status: 'FULFILLED',
+            accessExpiresAt: { lte: new Date() },
+            duration: { appId: app.id, deletedAt: null },
+          },
+        });
         return {
           id: app.id,
           templateId: app.templateId,
@@ -114,6 +121,7 @@ export class CatalogService {
           stockAvailable,
           stockLocked,
           stockSold,
+          expiredCount,
         };
       }),
     );
@@ -318,6 +326,13 @@ export class CatalogService {
         const stockSold = await this.prisma.subAccount.count({
           where: { status: 'SOLD', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
         });
+        const expiredCount = await this.prisma.order.count({
+          where: {
+            status: 'FULFILLED',
+            accessExpiresAt: { lte: new Date() },
+            durationId: d.id,
+          },
+        });
         return {
           id: d.id,
           label: d.label,
@@ -329,6 +344,7 @@ export class CatalogService {
           stockAvailable,
           stockLocked,
           stockSold,
+          expiredCount,
         };
       }),
     );
