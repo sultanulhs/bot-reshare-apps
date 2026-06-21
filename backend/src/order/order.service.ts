@@ -210,7 +210,7 @@ export class OrderService {
   }
 
   async getSellerPendingFulfillments(sellerId: string) {
-    return this.prisma.order.findMany({
+    const orders = await this.prisma.order.findMany({
       where: {
         status: 'WAITING_SELLER',
         duration: { app: { sellerId } },
@@ -222,6 +222,19 @@ export class OrderService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return orders.map((o) => ({
+      id: o.id,
+      appName: o.duration?.app?.template?.name ?? 'Pesanan',
+      durationLabel: o.duration?.label ?? '-',
+      productType: o.duration?.productType ?? null,
+      buyerInfo: o.buyerInfo,
+      buyerName: o.buyerName,
+      buyerUsername: o.buyerUsername,
+      buyerTgUserId: o.buyerTgUserId.toString(),
+      totalAmount: o.totalAmount,
+      createdAt: o.createdAt,
+    }));
   }
 
   async fulfilOnDemand(

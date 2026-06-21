@@ -19,7 +19,11 @@ interface PendingOrder {
   durationLabel?: string;
   appName?: string;
   buyerInfo?: string;
+  buyerName?: string;
+  buyerUsername?: string;
+  buyerTgUserId?: string;
   productType?: string;
+  totalAmount?: number;
   createdAt: string;
 }
 
@@ -119,6 +123,14 @@ export default function PendingOrdersScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{pending.appName || 'Pesanan'}</Text>
               <Text style={styles.cardSub}>{pending.durationLabel || '-'}</Text>
+              <Text style={styles.cardBuyer}>
+                👤 {pending.buyerName
+                  ? `${pending.buyerName}${pending.buyerUsername ? ` (@${pending.buyerUsername})` : ''}`
+                  : pending.buyerUsername ? `@${pending.buyerUsername}` : `@${pending.buyerTgUserId || '-'}`}
+              </Text>
+              {pending.totalAmount && (
+                <Text style={styles.cardPrice}>💰 Rp{pending.totalAmount.toLocaleString('id-ID')}</Text>
+              )}
               {pending.buyerInfo && (
                 <View style={styles.buyerInfoBox}>
                   <Text style={styles.buyerInfoLabel}>Info Pembeli:</Text>
@@ -194,6 +206,8 @@ const styles = StyleSheet.create({
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardSub: { fontSize: 13, color: '#666', marginTop: 4 },
+  cardBuyer: { fontSize: 12, color: '#555', marginTop: 4 },
+  cardPrice: { fontSize: 13, fontWeight: '600', color: '#111', marginTop: 4 },
   expiredCard: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
   expiredDate: { fontSize: 12, color: '#ef4444', marginTop: 6, fontWeight: '500' },
   buyerInfoBox: {

@@ -7,6 +7,9 @@ import { FulfilmentService } from '../../webhook/fulfilment.service';
 
 const isTestPayEnabled = process.env.TEST_PAYMENT_ENABLED === 'true';
 
+// In-memory state for MANUAL orders awaiting buyer info
+const pendingManualOrders = new Map<string, { durationId: string; sellerId: string }>();
+
 export function createBuyerComposer(
   prisma: PrismaService,
   botConfigService: BotConfigService,
@@ -203,10 +206,15 @@ export function createBuyerComposer(
       .text('✅ Konfirmasi Beli', `confirm_${durationId}`)
       .text('❌ Batal', `app_${duration.appId}`);
 
+    const typeLabel = duration.productType === 'MANUAL'
+      ? '📋 Tipe: Manual (penjual memproses)'
+      : '📋 Tipe: Akun Siap';
+
     await ctx.reply(
       `\u{1F6D2} *Detail Paket*\n\n` +
         `\u{1F4F1} ${duration.app.template.name}\n` +
         `\u{23F3} Durasi: ${duration.label}\n` +
+        `${typeLabel}\n` +
         `\u{1F4B0} Harga: Rp${duration.basePrice.toLocaleString('id-ID')}\n\n` +
         `_Harga final akan ditampilkan saat pembayaran._\n\n` +
         `Konfirmasi pembelian?`,
@@ -230,6 +238,20 @@ export function createBuyerComposer(
     }
 
     try {
+      // Check if MANUAL → ask for buyer info first
+      const duration = await prisma.duration.findUnique({
+        where: { id: durationId },
+      });
+      if (duration?.productType === 'MANUAL') {
+        const label = duration.buyerInfoLabel || 'informasi akun Anda';
+        pendingManualOrders.set(tgUserId.toString(), { durationId, sellerId: affiliation.sellerId });
+        await ctx.reply(
+          `📝 *Masukkan ${label}*\n\n_Balas pesan ini dengan informasi yang diminta._`,
+          { parse_mode: 'Markdown' },
+        );
+        return;
+      }
+
       const buyerName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || undefined;
       const buyerUsername = ctx.from.username || undefined;
 
@@ -414,6 +436,50 @@ export function createBuyerComposer(
     await ctx.reply(
       '✅ Laporan Anda telah dikirim ke penjual. Kami akan memproses segera.',
     );
+  });
+
+  // Handle text replies for MANUAL orders (buyer info input)
+  composer.on('message:text', async (ctx) => {
+    const tgUserId = ctx.from.id.toString();
+    const pending = pendingManualOrders.get(tgUserId);
+    if (!pending) return;
+
+    pendingManualOrders.delete(tgUserId);
+    const buyerInfo = ctx.message.text;
+
+    try {
+      const buyerName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || undefined;
+      const buyerUsername = ctx.from.username || undefined;
+
+      const order = await orderService.createOrder({
+        buyerTgUserId: BigInt(ctx.from.id),
+        buyerName,
+        buyerUsername,
+        durationId: pending.durationId,
+        sellerId: pending.sellerId,
+        buyerInfo,
+      });
+
+      const qrKeyboard = isTestPayEnabled
+        ? new InlineKeyboard().text('🧪 Simulasi Bayar (Testing)', `testpay_${order.partnerReferenceNo}`)
+        : undefined;
+
+      await ctx.replyWithPhoto(
+        new InputFile(order.qrImage, 'qris.png'),
+        {
+          caption:
+            `\u{1F4B3} *Pembayaran QRIS*\n\n` +
+            `Total: Rp${order.totalAmount.toLocaleString('id-ID')}\n` +
+            `Berlaku sampai: ${order.expiresAt.toLocaleString('id-ID')}\n\n` +
+            `Scan QR di atas untuk membayar via DANA.\n` +
+            `Order ID: \`${order.orderId}\``,
+          parse_mode: 'Markdown',
+          reply_markup: qrKeyboard,
+        },
+      );
+    } catch (err: any) {
+      await ctx.reply(`❌ Gagal membuat pesanan: ${err.message}`);
+    }
   });
 
   return composer;
