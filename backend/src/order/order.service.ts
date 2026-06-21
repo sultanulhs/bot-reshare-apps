@@ -50,6 +50,14 @@ export class OrderService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Block if buyer has a pending order
+      const pendingOrder = await tx.order.findFirst({
+        where: { buyerTgUserId: params.buyerTgUserId, status: 'PENDING' },
+      });
+      if (pendingOrder) {
+        throw new BadRequestException('Anda masih memiliki pesanan yang belum dibayar. Selesaikan pembayaran terlebih dahulu.');
+      }
+
       let accountId: string | undefined;
       let subAccountId: string | undefined;
 
