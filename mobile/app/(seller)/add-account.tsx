@@ -255,45 +255,62 @@ export default function AddAccountScreen() {
       )}
 
       {/* Manual Orders Section */}
-      {manualOrders.length > 0 && (
+      {isManual && (
         <>
           <Text style={styles.sectionTitle}>Pesanan Manual</Text>
-          {manualOrders.map((order) => {
-            const statusColors: Record<string, string> = {
-              FULFILLED: '#16a34a', PENDING: '#f59e0b', WAITING_SELLER: '#f59e0b',
-              EXPIRED: '#ef4444', FAILED: '#ef4444',
-            };
-            const buyerLabel = order.buyerName
-              ? `${order.buyerName}${order.buyerUsername ? ` (@${order.buyerUsername})` : ''}`
-              : `@${order.buyerTgUserId}`;
-            const fmtDate = (d: string) => new Date(d).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
-            return (
-              <View key={order.id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: statusColors[order.status] || '#999' }]}>
-                <View style={styles.cardRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardEmail}>👤 {buyerLabel}</Text>
-                    {order.buyerInfo && <Text style={styles.cardPass}>📋 {order.buyerInfo}</Text>}
+          <FlatList
+            data={manualOrders}
+            keyExtractor={(item) => item.id}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            renderItem={({ item: order }) => {
+              const statusColors: Record<string, string> = {
+                FULFILLED: '#16a34a', PENDING: '#f59e0b', WAITING_SELLER: '#f59e0b',
+                EXPIRED: '#ef4444', FAILED: '#ef4444',
+              };
+              const buyerLabel = order.buyerName
+                ? `${order.buyerName}${order.buyerUsername ? ` (@${order.buyerUsername})` : ''}`
+                : `@${order.buyerTgUserId}`;
+              const fmtDate = (d: string) => new Date(d).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+
+              // Calculate next reminder and check if overdue
+              const now = new Date();
+              let nextReminder: Date | null = null;
+              let isReminderOverdue = false;
+              if (order.fulfilledAt && order.reminderEnabled) {
+                const d = new Date(order.fulfilledAt);
+                d.setMonth(d.getMonth() + 1);
+                d.setDate(1); d.setHours(9, 0, 0, 0);
+                // Find the next future reminder
+                const overdue = new Date(d);
+                if (overdue <= now) {
+                  isReminderOverdue = true;
+                }
+                while (d <= now) { d.setMonth(d.getMonth() + 1); }
+                nextReminder = d;
+              }
+
+              const cardBorderColor = isReminderOverdue ? '#ef4444' : (statusColors[order.status] || '#999');
+              const cardBg = isReminderOverdue ? '#fef2f2' : '#fff';
+
+              return (
+                <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: cardBorderColor, backgroundColor: cardBg }]}>
+                  <View style={styles.cardRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardEmail}>👤 {buyerLabel}</Text>
+                      {order.buyerInfo && <Text style={styles.cardPass}>📋 {order.buyerInfo}</Text>}
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: statusColors[order.status] || '#999' }]}>
+                      <Text style={styles.badgeText}>{order.status}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.badge, { backgroundColor: statusColors[order.status] || '#999' }]}>
-                    <Text style={styles.badgeText}>{order.status}</Text>
-                  </View>
-                </View>
-                <Text style={styles.cardMeta}>💰 Rp{order.totalAmount.toLocaleString('id-ID')}</Text>
-                <Text style={styles.cardMeta}>📅 {fmtDate(order.createdAt)}</Text>
-                {order.fulfilledAt && <Text style={styles.cardMeta}>✅ Selesai: {fmtDate(order.fulfilledAt)}</Text>}
-                {order.accessExpiresAt && <Text style={styles.cardMeta}>⏰ Berlaku s/d: {fmtDate(order.accessExpiresAt)}</Text>}
-                {(order.status === 'PENDING' || order.status === 'EXPIRED') && order.expiresAt && (
-                  <Text style={styles.cardMeta}>{order.status === 'PENDING' ? '⏰ Batas bayar' : '❌ Expired'}: {fmtDate(order.expiresAt)}</Text>
-                )}
-                {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (() => {
-                  const nextReminder = order.fulfilledAt ? (() => {
-                    const d = new Date(order.fulfilledAt);
-                    d.setMonth(d.getMonth() + 1);
-                    d.setDate(1); d.setHours(9, 0, 0, 0);
-                    while (d <= new Date()) { d.setMonth(d.getMonth() + 1); }
-                    return d;
-                  })() : null;
-                  return (
+                  <Text style={styles.cardMeta}>💰 Rp{order.totalAmount.toLocaleString('id-ID')}</Text>
+                  <Text style={styles.cardMeta}>📅 {fmtDate(order.createdAt)}</Text>
+                  {order.fulfilledAt && <Text style={styles.cardMeta}>✅ Selesai: {fmtDate(order.fulfilledAt)}</Text>}
+                  {order.accessExpiresAt && <Text style={styles.cardMeta}>⏰ Berlaku s/d: {fmtDate(order.accessExpiresAt)}</Text>}
+                  {(order.status === 'PENDING' || order.status === 'EXPIRED') && order.expiresAt && (
+                    <Text style={styles.cardMeta}>{order.status === 'PENDING' ? '⏰ Batas bayar' : '❌ Expired'}: {fmtDate(order.expiresAt)}</Text>
+                  )}
+                  {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (
                     <>
                       <View style={styles.actionInlineRow}>
                         <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
@@ -308,16 +325,17 @@ export default function AddAccountScreen() {
                         </View>
                       </View>
                       {order.reminderEnabled && nextReminder && (
-                        <Text style={styles.reminderDate}>
-                          🔔 Reminder: {nextReminder.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                        <Text style={isReminderOverdue ? styles.reminderOverdue : styles.reminderDate}>
+                          {isReminderOverdue ? '⚠️' : '🔔'} Reminder: {nextReminder.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                         </Text>
                       )}
                     </>
-                  );
-                })()}
-              </View>
-            );
-          })}
+                  )}
+                </View>
+              );
+            }}
+            ListEmptyComponent={<Text style={styles.empty}>Belum ada pesanan manual</Text>}
+          />
         </>
       )}
 
@@ -424,12 +442,13 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
   deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
-  actionInlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 8 },
-  sendMsgBtn: { backgroundColor: '#2563eb', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, flex: 1, alignItems: 'center' },
+  actionInlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+  sendMsgBtn: { backgroundColor: '#2563eb', borderRadius: 6, paddingVertical: 8, flex: 1, alignItems: 'center' },
   sendMsgBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  reminderInline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reminderInline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, flex: 1 },
   reminderLabel: { fontSize: 16 },
   reminderDate: { fontSize: 11, color: '#2563eb', marginTop: 4 },
+  reminderOverdue: { fontSize: 11, color: '#ef4444', fontWeight: '600', marginTop: 4 },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
