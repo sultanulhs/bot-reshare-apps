@@ -18,6 +18,7 @@ interface SubAccount {
   buyerUsername?: string | null;
   buyerInfo?: string | null;
   orderStatus?: string | null;
+  expiresAt?: string | null;
   accessExpiresAt?: string | null;
   createdAt: string;
 }
@@ -152,13 +153,18 @@ export default function SubAccountsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName}>{item.name}</Text>
                 <Text style={styles.cardPin}>PIN: {item.pin}</Text>
-                {item.buyerTgUserId && item.status === 'SOLD' && (
-                  <Text style={item.isExpired ? styles.buyerExpired : styles.buyerActive}>
-                    {item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {
+                {item.buyerTgUserId && (item.status === 'SOLD' || item.status === 'LOCKED') && (
+                  <Text style={item.isExpired ? styles.buyerExpired : item.status === 'LOCKED' ? styles.buyerLocked : styles.buyerActive}>
+                    {item.status === 'LOCKED' ? '🔒 Menunggu Bayar' : item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {
                       item.buyerName
                         ? `${item.buyerName}${item.buyerUsername ? ` (@${item.buyerUsername})` : ''}`
                         : item.buyerInfo || (item.buyerUsername ? `@${item.buyerUsername}` : `@${item.buyerTgUserId}`)
                     }
+                  </Text>
+                )}
+                {item.status === 'LOCKED' && item.expiresAt && (
+                  <Text style={styles.expiryDate}>
+                    ⏰ Batas bayar: {new Date(item.expiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                   </Text>
                 )}
                 {item.accessExpiresAt && item.status === 'SOLD' && (
@@ -242,6 +248,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   cardExpired: { backgroundColor: '#fef2f2', borderLeftWidth: 3, borderLeftColor: '#ef4444' },
   buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
+  buyerLocked: { color: '#f59e0b', fontSize: 12, marginTop: 4 },
   buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   expiryDate: { color: '#999', fontSize: 11, marginTop: 2 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

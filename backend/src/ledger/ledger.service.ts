@@ -45,6 +45,7 @@ export class LedgerService {
       buyerUsername: o.buyerUsername ?? null,
       buyerTgUserId: o.buyerTgUserId.toString(),
       createdAt: o.createdAt,
+      expiresAt: o.expiresAt,
       fulfilledAt: o.fulfilledAt,
       accessExpiresAt: o.accessExpiresAt,
     }));

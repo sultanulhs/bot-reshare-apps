@@ -137,6 +137,7 @@ export class StockService {
             buyerUsername: true,
             buyerInfo: true,
             status: true,
+            expiresAt: true,
             accessExpiresAt: true,
           },
         },
@@ -163,6 +164,7 @@ export class StockService {
         buyerUsername: s.order?.buyerUsername || null,
         buyerInfo: s.order?.buyerInfo || null,
         orderStatus: s.order?.status || null,
+        expiresAt: s.order?.expiresAt || null,
         accessExpiresAt: s.order?.accessExpiresAt || null,
         createdAt: s.createdAt,
       };
