@@ -31,6 +31,7 @@ interface Duration {
   stockLocked?: number;
   stockSold?: number;
   expiredCount?: number;
+  pendingWarrantyCount?: number;
 }
 
 interface AppDetail {
@@ -251,7 +252,7 @@ export default function AppDetailScreen() {
         )}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
+            style={[styles.card, (item.expiredCount ?? 0) > 0 ? styles.cardExpired : (item.pendingWarrantyCount ?? 0) > 0 && styles.cardWarrantyPending]}
             onPress={() =>
               router.push({
                 pathname: '/(seller)/add-account',
@@ -289,6 +290,9 @@ export default function AppDetailScreen() {
             </Text>
             {(item.expiredCount ?? 0) > 0 && (
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
+            )}
+            {(item.pendingWarrantyCount ?? 0) > 0 && (
+              <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
             )}
           </TouchableOpacity>
         )}
@@ -494,7 +498,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   actionRow: { flexDirection: 'row', gap: 8 },

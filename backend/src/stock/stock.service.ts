@@ -121,6 +121,9 @@ export class StockService {
             ],
           },
         });
+        const pendingWarranty = await this.prisma.order.count({
+          where: { warrantyStatus: 'SUBMITTED', OR: [{ subAccount: { accountId: a.id } }, { accountId: a.id }] },
+        });
         const isExpired = !!(
           a.order &&
           a.order.status === 'FULFILLED' &&
@@ -137,6 +140,7 @@ export class StockService {
           subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
           subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
           expiredCount: expiredOrders,
+          pendingWarrantyCount: pendingWarranty,
           isExpired,
           buyerTgUserId: a.order?.buyerTgUserId?.toString() || null,
           buyerName: a.order?.buyerName || null,

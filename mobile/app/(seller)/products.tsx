@@ -30,6 +30,7 @@ interface App {
   stockLocked?: number;
   stockSold?: number;
   expiredCount?: number;
+  pendingWarrantyCount?: number;
 }
 
 export default function ProductsScreen() {
@@ -239,9 +240,10 @@ export default function ProductsScreen() {
           const stockLocked = item.stockLocked ?? 0;
           const stockSold = item.stockSold ?? 0;
           const expiredCount = item.expiredCount ?? 0;
+          const pendingWarrantyCount = item.pendingWarrantyCount ?? 0;
           return (
             <TouchableOpacity
-              style={[styles.card, !item.active && styles.cardInactive, expiredCount > 0 && styles.cardExpired]}
+              style={[styles.card, !item.active && styles.cardInactive, expiredCount > 0 ? styles.cardExpired : pendingWarrantyCount > 0 && styles.cardWarrantyPending]}
               onPress={() =>
                 router.push({
                   pathname: '/(seller)/app-detail',
@@ -266,6 +268,9 @@ export default function ProductsScreen() {
               </Text>
               {expiredCount > 0 && (
                 <Text style={styles.expiredBadge}>{expiredCount} kadaluarsa</Text>
+              )}
+              {pendingWarrantyCount > 0 && (
+                <Text style={styles.warrantyBadge}>{pendingWarrantyCount} verifikasi</Text>
               )}
             </TouchableOpacity>
           );
@@ -618,7 +623,9 @@ const styles = StyleSheet.create({
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardInactive: { opacity: 0.5 },
   cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   cardNotes: { fontSize: 12, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },

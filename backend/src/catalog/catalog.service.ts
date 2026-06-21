@@ -126,6 +126,9 @@ export class CatalogService {
             duration: { appId: app.id, deletedAt: null },
           },
         });
+        const pendingWarrantyCount = await this.prisma.order.count({
+          where: { warrantyStatus: 'SUBMITTED', duration: { appId: app.id, deletedAt: null } },
+        });
         return {
           id: app.id,
           templateId: app.templateId,
@@ -139,6 +142,7 @@ export class CatalogService {
           stockLocked,
           stockSold,
           expiredCount,
+          pendingWarrantyCount,
         };
       }),
     );
@@ -377,6 +381,9 @@ export class CatalogService {
             durationId: d.id,
           },
         });
+        const pendingWarrantyCount = await this.prisma.order.count({
+          where: { warrantyStatus: 'SUBMITTED', durationId: d.id },
+        });
         return {
           id: d.id,
           label: d.label,
@@ -390,6 +397,7 @@ export class CatalogService {
           stockLocked,
           stockSold,
           expiredCount,
+          pendingWarrantyCount,
         };
       }),
     );

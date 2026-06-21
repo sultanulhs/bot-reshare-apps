@@ -17,6 +17,7 @@ interface Account {
   subLocked: number;
   subSold: number;
   expiredCount?: number;
+  pendingWarrantyCount?: number;
   isExpired?: boolean;
   buyerTgUserId?: string | null;
   buyerName?: string | null;
@@ -218,7 +219,7 @@ export default function AddAccountScreen() {
           } : {};
           return (
           <CardWrapper
-            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
+            style={[styles.card, (item.expiredCount ?? 0) > 0 ? styles.cardExpired : (item.pendingWarrantyCount ?? 0) > 0 && styles.cardWarrantyPending]}
             {...cardProps}
           >
             <View style={styles.cardRow}>
@@ -274,6 +275,9 @@ export default function AddAccountScreen() {
             )}
             {(item.expiredCount ?? 0) > 0 && (
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
+            )}
+            {(item.pendingWarrantyCount ?? 0) > 0 && (
+              <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
             )}
             <View style={styles.cardFooter}>
               {item.hasSubAccounts ? (
@@ -490,6 +494,8 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
+  warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
   buyerLocked: { color: '#f59e0b', fontSize: 12, marginTop: 4 },
   buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
