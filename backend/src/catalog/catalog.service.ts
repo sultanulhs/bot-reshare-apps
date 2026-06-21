@@ -91,15 +91,17 @@ export class CatalogService {
 
     const appsWithStock = await Promise.all(
       apps.map(async (app) => {
-        const stockAvailable = await this.prisma.subAccount.count({
-          where: { status: 'AVAILABLE', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
-        });
-        const stockLocked = await this.prisma.subAccount.count({
-          where: { status: 'LOCKED', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
-        });
-        const stockSold = await this.prisma.subAccount.count({
-          where: { status: 'SOLD', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
-        });
+        const appDurationFilter = { deletedAt: null, duration: { appId: app.id, deletedAt: null } };
+        const noSubFilter = { ...appDurationFilter, subAccounts: { none: { deletedAt: null } } };
+        const stockAvailable =
+          (await this.prisma.subAccount.count({ where: { status: 'AVAILABLE', deletedAt: null, account: appDurationFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'AVAILABLE', ...noSubFilter } }));
+        const stockLocked =
+          (await this.prisma.subAccount.count({ where: { status: 'LOCKED', deletedAt: null, account: appDurationFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'LOCKED', ...noSubFilter } }));
+        const stockSold =
+          (await this.prisma.subAccount.count({ where: { status: 'SOLD', deletedAt: null, account: appDurationFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'SOLD', ...noSubFilter } }));
         const accountCount = await this.prisma.account.count({
           where: { deletedAt: null, duration: { appId: app.id, deletedAt: null } },
         });
@@ -319,15 +321,17 @@ export class CatalogService {
         const accountCount = await this.prisma.account.count({
           where: { durationId: d.id, deletedAt: null },
         });
-        const stockAvailable = await this.prisma.subAccount.count({
-          where: { status: 'AVAILABLE', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
-        });
-        const stockLocked = await this.prisma.subAccount.count({
-          where: { status: 'LOCKED', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
-        });
-        const stockSold = await this.prisma.subAccount.count({
-          where: { status: 'SOLD', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
-        });
+        const durFilter = { durationId: d.id, deletedAt: null };
+        const noSubDurFilter = { ...durFilter, subAccounts: { none: { deletedAt: null } } };
+        const stockAvailable =
+          (await this.prisma.subAccount.count({ where: { status: 'AVAILABLE', deletedAt: null, account: durFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'AVAILABLE', ...noSubDurFilter } }));
+        const stockLocked =
+          (await this.prisma.subAccount.count({ where: { status: 'LOCKED', deletedAt: null, account: durFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'LOCKED', ...noSubDurFilter } }));
+        const stockSold =
+          (await this.prisma.subAccount.count({ where: { status: 'SOLD', deletedAt: null, account: durFilter } })) +
+          (await this.prisma.account.count({ where: { status: 'SOLD', ...noSubDurFilter } }));
         const expiredCount = await this.prisma.order.count({
           where: {
             status: 'FULFILLED',

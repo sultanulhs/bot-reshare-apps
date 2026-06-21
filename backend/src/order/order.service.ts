@@ -54,6 +54,7 @@ export class OrderService {
       let subAccountId: string | undefined;
 
       if (duration.productType === 'AKUN_READY') {
+        // Try sub-account first (sharing model)
         const sub = await tx.subAccount.findFirst({
           where: {
             status: 'AVAILABLE',
@@ -62,14 +63,27 @@ export class OrderService {
           },
           orderBy: { createdAt: 'asc' },
         });
-        if (!sub) {
-          throw new BadRequestException('No stock available');
+
+        if (sub) {
+          await tx.subAccount.update({ where: { id: sub.id }, data: { status: 'LOCKED' } });
+          subAccountId = sub.id;
+        } else {
+          // Fallback: account without sub-accounts (private model)
+          const acc = await tx.account.findFirst({
+            where: {
+              durationId: duration.id,
+              status: 'AVAILABLE',
+              deletedAt: null,
+              subAccounts: { none: { deletedAt: null } },
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+          if (!acc) {
+            throw new BadRequestException('No stock available');
+          }
+          await tx.account.update({ where: { id: acc.id }, data: { status: 'LOCKED' } });
+          accountId = acc.id;
         }
-        await tx.subAccount.update({
-          where: { id: sub.id },
-          data: { status: 'LOCKED' },
-        });
-        subAccountId = sub.id;
       }
       // MANUAL: no account needed
 

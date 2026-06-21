@@ -107,7 +107,10 @@ export class StockService {
           where: {
             status: 'FULFILLED',
             accessExpiresAt: { lte: now },
-            subAccount: { accountId: a.id },
+            OR: [
+              { subAccount: { accountId: a.id } },
+              { accountId: a.id },
+            ],
           },
         });
         return {
@@ -200,10 +203,11 @@ export class StockService {
       const activeOrders = await this.prisma.order.findMany({
         where: {
           status: 'FULFILLED',
-          subAccount: { accountId: id },
           OR: [
-            { accessExpiresAt: null },
-            { accessExpiresAt: { gt: new Date() } },
+            { subAccount: { accountId: id }, accessExpiresAt: null },
+            { subAccount: { accountId: id }, accessExpiresAt: { gt: new Date() } },
+            { accountId: id, accessExpiresAt: null },
+            { accountId: id, accessExpiresAt: { gt: new Date() } },
           ],
         },
         include: {
@@ -235,13 +239,26 @@ export class StockService {
     // Reset stock for expired orders after password change
     const now = new Date();
     const expiredOrders = await this.prisma.order.findMany({
-      where: { status: 'FULFILLED', accessExpiresAt: { lte: now }, subAccount: { accountId: id } },
+      where: {
+        status: 'FULFILLED',
+        accessExpiresAt: { lte: now },
+        OR: [
+          { subAccount: { accountId: id } },
+          { accountId: id },
+        ],
+      },
     });
     if (expiredOrders.length > 0) {
       for (const order of expiredOrders) {
         if (order.subAccountId) {
           await this.prisma.subAccount.update({
             where: { id: order.subAccountId },
+            data: { status: 'AVAILABLE' },
+          });
+        }
+        if (order.accountId) {
+          await this.prisma.account.update({
+            where: { id: order.accountId },
             data: { status: 'AVAILABLE' },
           });
         }
