@@ -464,7 +464,8 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const o of orders) {
       const name = o.duration?.app?.template?.name ?? 'Pesanan';
-      keyboard.text(`\u{1F4F8} ${name}`, `warranty_${o.id}`).row();
+      const label = o.duration?.label ?? '';
+      keyboard.text(`\u{1F4F8} ${name}${label ? ` (${label})` : ''}`, `warranty_${o.id}`).row();
     }
     await ctx.reply('\u{1F6E1}\u{FE0F} *Aktivasi Garansi*\n\nPilih pesanan untuk mengirim screenshot login:', {
       reply_markup: keyboard, parse_mode: 'Markdown',

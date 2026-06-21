@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Modal, BackHandler, RefreshControl,
+  Alert, Modal, BackHandler, RefreshControl, Image,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -44,6 +44,16 @@ export default function SubAccountsScreen() {
   const [editingSubAccount, setEditingSubAccount] = useState<SubAccount | null>(null);
   const [editName, setEditName] = useState('');
   const [editPin, setEditPin] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const viewWarrantyPhoto = async (orderId: string) => {
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/warranty-photo`, { responseType: 'arraybuffer' });
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(res.data)));
+      const contentType = res.headers['content-type'] || 'image/jpeg';
+      setPhotoUri(`data:${contentType};base64,${base64}`);
+    } catch { Alert.alert('Error', 'Gagal memuat foto'); }
+  };
 
   const { data: subAccounts, isLoading, refetch } = useQuery<SubAccount[]>({
     queryKey: ['seller-sub-accounts', accountId],
@@ -192,7 +202,9 @@ export default function SubAccountsScreen() {
                     color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                   }}>
                     {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                    {item.warrantyPhoto && item.orderId && item.warrantyStatus !== 'SUBMITTED' && ' \u{1F4F8}'}
+                    {item.warrantyPhoto && item.orderId && (
+                      <Text onPress={() => viewWarrantyPhoto(item.orderId!)} style={{ color: '#2563eb' }}> 📷 Lihat</Text>
+                    )}
                   </Text>
                 )}
                 {item.warrantyStatus === 'SUBMITTED' && item.orderId && (
@@ -273,6 +285,14 @@ export default function SubAccountsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Photo Viewer Modal */}
+      <Modal visible={!!photoUri} animationType="fade" transparent>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPhotoUri(null)}>
+          {photoUri && <Image source={{ uri: photoUri }} style={{ width: '90%', height: '70%', resizeMode: 'contain' }} />}
+          <Text style={{ color: '#fff', marginTop: 16, fontSize: 14 }}>Ketuk untuk tutup</Text>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
