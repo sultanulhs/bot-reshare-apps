@@ -100,9 +100,9 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const cat of filtered) {
       const stock = catStock.get(cat.id) ?? 0;
-      const stockLabel = stock > 0 ? ' ✅' : ' (Habis)';
+      const indicator = stock > 0 ? '✅' : '❌';
       keyboard
-        .text(`${cat.icon ?? ''} ${cat.name}${stockLabel}`.trim(), `cat_${cat.id}`)
+        .text(`${indicator} ${cat.icon ?? ''} ${cat.name}`.trim(), `cat_${cat.id}`)
         .row();
     }
 
@@ -137,8 +137,8 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const app of apps) {
       const stock = (app as any).stockAvailable ?? 0;
-      const indicator = stock > 0 ? ' ✅' : ' ❌ Habis';
-      keyboard.text(`${app.template.name}${indicator}`, `app_${app.id}`).row();
+      const indicator = stock > 0 ? '✅' : '❌';
+      keyboard.text(`${indicator} ${app.template.name}`, `app_${app.id}`).row();
     }
     keyboard.text('\u{2B05}️ Kembali', 'catalog').row();
 
@@ -163,10 +163,10 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const dur of appWithStock.durations) {
       const stock = (dur as any).stockAvailable ?? 0;
-      const indicator = stock > 0 ? ' ✅' : ' ❌';
+      const indicator = stock > 0 ? '✅' : '❌';
       keyboard
         .text(
-          `${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}${indicator}`,
+          `${indicator} ${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}`,
           `buy_${dur.id}`,
         )
         .row();
