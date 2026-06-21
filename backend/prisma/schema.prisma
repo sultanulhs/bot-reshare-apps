@@ -148,21 +148,23 @@ model Category {
   sellerId     String?
   seller       Seller?       @relation(fields: [sellerId], references: [id])
   appTemplates AppTemplate[]
+  deletedAt    DateTime?
   createdAt    DateTime      @default(now())
 
   @@unique([name, sellerId])
 }
 
 model AppTemplate {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
+  category   Category  @relation(fields: [categoryId], references: [id])
   name       String
-  isDefault  Boolean  @default(false)
+  isDefault  Boolean   @default(false)
   createdBy  String?
-  creator    Seller?  @relation(fields: [createdBy], references: [id])
+  creator    Seller?   @relation(fields: [createdBy], references: [id])
   apps       App[]
-  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   @@unique([name, categoryId])
 }
@@ -176,6 +178,7 @@ model App {
   notes      String?
   active     Boolean     @default(true)
   durations  Duration[]
+  deletedAt  DateTime?
   createdAt  DateTime    @default(now())
 
   @@unique([templateId, sellerId])
@@ -193,6 +196,7 @@ model Duration {
   active         Boolean     @default(true)
   accounts       Account[]
   orders         Order[]
+  deletedAt      DateTime?
   createdAt      DateTime    @default(now())
 }
 
@@ -209,6 +213,7 @@ model Account {
   status      StockStatus  @default(AVAILABLE)
   subAccounts SubAccount[]
   order       Order?
+  deletedAt   DateTime?
   createdAt   DateTime     @default(now())
 }
 
@@ -224,6 +229,7 @@ model SubAccount {
   pinTag    String
   status    StockStatus @default(AVAILABLE)
   order     Order?
+  deletedAt DateTime?
   createdAt DateTime    @default(now())
 }
 

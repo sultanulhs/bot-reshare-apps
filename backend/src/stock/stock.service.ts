@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { AddAccountDto } from './dto/add-account.dto';
 import { AddSubAccountDto } from './dto/add-sub-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
+import { UpdateSubAccountDto } from './dto/update-sub-account.dto';
 
 @Injectable()
 export class StockService {
@@ -13,7 +15,7 @@ export class StockService {
 
   async addAccount(sellerId: string, durationId: string, dto: AddAccountDto) {
     const duration = await this.prisma.duration.findFirst({
-      where: { id: durationId, app: { sellerId } },
+      where: { id: durationId, deletedAt: null, app: { sellerId, deletedAt: null } },
     });
     if (!duration) {
       throw new NotFoundException('Duration not found');
@@ -40,7 +42,7 @@ export class StockService {
 
   async addSubAccount(sellerId: string, accountId: string, dto: AddSubAccountDto) {
     const account = await this.prisma.account.findFirst({
-      where: { id: accountId, duration: { app: { sellerId } } },
+      where: { id: accountId, deletedAt: null, duration: { deletedAt: null, app: { sellerId, deletedAt: null } } },
     });
     if (!account) {
       throw new NotFoundException('Account not found');
@@ -67,15 +69,15 @@ export class StockService {
 
   async listAccounts(sellerId: string, durationId: string) {
     const duration = await this.prisma.duration.findFirst({
-      where: { id: durationId, app: { sellerId } },
+      where: { id: durationId, deletedAt: null, app: { sellerId, deletedAt: null } },
     });
     if (!duration) {
       throw new NotFoundException('Duration not found');
     }
 
     const accounts = await this.prisma.account.findMany({
-      where: { durationId },
-      include: { _count: { select: { subAccounts: true } } },
+      where: { durationId, deletedAt: null },
+      include: { _count: { select: { subAccounts: { where: { deletedAt: null } } } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -91,7 +93,7 @@ export class StockService {
 
   async listSubAccounts(accountId: string) {
     const subAccounts = await this.prisma.subAccount.findMany({
-      where: { accountId },
+      where: { accountId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -102,5 +104,92 @@ export class StockService {
       status: s.status,
       createdAt: s.createdAt,
     }));
+  }
+
+  async updateAccount(sellerId: string, id: string, dto: UpdateAccountDto) {
+    const account = await this.prisma.account.findFirst({
+      where: { id, deletedAt: null },
+      include: { duration: { include: { app: { select: { sellerId: true } } } } },
+    });
+    if (!account) throw new NotFoundException('Account not found');
+    if (account.duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your account');
+
+    const data: any = {};
+    if (dto.email !== undefined) {
+      const enc = this.crypto.encrypt(dto.email);
+      data.encEmail = enc.ciphertext;
+      data.emailIv = enc.iv;
+      data.emailTag = enc.authTag;
+    }
+    if (dto.password !== undefined) {
+      const enc = this.crypto.encrypt(dto.password);
+      data.encPassword = enc.ciphertext;
+      data.passwordIv = enc.iv;
+      data.passwordTag = enc.authTag;
+    }
+
+    return this.prisma.account.update({ where: { id }, data });
+  }
+
+  async softDeleteAccount(sellerId: string, id: string) {
+    const account = await this.prisma.account.findFirst({
+      where: { id, deletedAt: null },
+      include: { duration: { include: { app: { select: { sellerId: true } } } } },
+    });
+    if (!account) throw new NotFoundException('Account not found');
+    if (account.duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your account');
+
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.subAccount.updateMany({
+        where: { accountId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      this.prisma.account.update({
+        where: { id },
+        data: { deletedAt: now },
+      }),
+    ]);
+
+    return { success: true };
+  }
+
+  async updateSubAccount(sellerId: string, id: string, dto: UpdateSubAccountDto) {
+    const subAccount = await this.prisma.subAccount.findFirst({
+      where: { id, deletedAt: null },
+      include: { account: { include: { duration: { include: { app: { select: { sellerId: true } } } } } } },
+    });
+    if (!subAccount) throw new NotFoundException('Sub-account not found');
+    if (subAccount.account.duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your sub-account');
+
+    const data: any = {};
+    if (dto.name !== undefined) {
+      const enc = this.crypto.encrypt(dto.name);
+      data.encName = enc.ciphertext;
+      data.nameIv = enc.iv;
+      data.nameTag = enc.authTag;
+    }
+    if (dto.pin !== undefined) {
+      const enc = this.crypto.encrypt(dto.pin);
+      data.encPin = enc.ciphertext;
+      data.pinIv = enc.iv;
+      data.pinTag = enc.authTag;
+    }
+
+    return this.prisma.subAccount.update({ where: { id }, data });
+  }
+
+  async softDeleteSubAccount(sellerId: string, id: string) {
+    const subAccount = await this.prisma.subAccount.findFirst({
+      where: { id, deletedAt: null },
+      include: { account: { include: { duration: { include: { app: { select: { sellerId: true } } } } } } },
+    });
+    if (!subAccount) throw new NotFoundException('Sub-account not found');
+    if (subAccount.account.duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your sub-account');
+
+    return this.prisma.subAccount.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

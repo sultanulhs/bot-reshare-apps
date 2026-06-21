@@ -27,6 +27,9 @@ export default function AddAccountScreen() {
   const [showAdd, setShowAdd] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
 
   const { data: accounts, isLoading, refetch } = useQuery<Account[]>({
     queryKey: ['seller-accounts', durationId],
@@ -65,10 +68,53 @@ export default function AddAccountScreen() {
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
+  const updateAccount = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { email?: string; password?: string } }) =>
+      api.patch(`/seller/accounts/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+      setEditingAccount(null);
+      setEditEmail('');
+      setEditPassword('');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const deleteAccount = useMutation({
+    mutationFn: (id: string) => api.delete(`/seller/accounts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
   const handleSubmit = () => {
     if (!email.trim()) { Alert.alert('Error', 'Email harus diisi'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Password harus diisi'); return; }
     addAccount.mutate();
+  };
+
+  const handleEditAccount = (account: Account) => {
+    setEditingAccount(account);
+    setEditEmail(account.email);
+    setEditPassword(account.password);
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingAccount) return;
+    if (!editEmail.trim()) { Alert.alert('Error', 'Email harus diisi'); return; }
+    if (!editPassword.trim()) { Alert.alert('Error', 'Password harus diisi'); return; }
+    updateAccount.mutate({
+      id: editingAccount.id,
+      data: { email: editEmail.trim(), password: editPassword.trim() },
+    });
+  };
+
+  const handleDeleteAccount = (account: Account) => {
+    Alert.alert('Hapus Akun', `Yakin ingin menghapus akun ${account.email}? Semua sub-akun juga akan dihapus.`, [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: () => deleteAccount.mutate(account.id) },
+    ]);
   };
 
   const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : '#f59e0b';
@@ -76,7 +122,7 @@ export default function AddAccountScreen() {
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={handleBack}>
-        <Text style={styles.backBtn}>← Kembali</Text>
+        <Text style={styles.backBtn}>{'<-'} Kembali</Text>
       </TouchableOpacity>
 
       <Text style={styles.header}>{durationLabel}</Text>
@@ -106,9 +152,19 @@ export default function AddAccountScreen() {
                 <Text style={styles.badgeText}>{item.status}</Text>
               </View>
             </View>
-            <Text style={styles.cardMeta}>
-              {item.subAccountCount} sub-akun · {new Date(item.createdAt).toLocaleDateString('id-ID')}
-            </Text>
+            <View style={styles.cardFooter}>
+              <Text style={styles.cardMeta}>
+                {item.subAccountCount} sub-akun
+              </Text>
+              <View style={styles.actionRow}>
+                <TouchableOpacity onPress={() => handleEditAccount(item)} style={styles.actionBtn}>
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteAccount(item)} style={styles.actionBtn}>
+                  <Text style={styles.deleteBtnText}>Hapus</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
@@ -116,6 +172,26 @@ export default function AddAccountScreen() {
         }
       />
 
+      {/* Modal Edit Akun */}
+      <Modal visible={!!editingAccount} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Akun</Text>
+            <TextInput style={styles.input} placeholder="Email" value={editEmail}
+              onChangeText={setEditEmail} keyboardType="email-address" autoCapitalize="none" />
+            <TextInput style={styles.input} placeholder="Password" value={editPassword}
+              onChangeText={setEditPassword} />
+            <TouchableOpacity style={styles.button} onPress={handleEditSubmit} disabled={updateAccount.isPending}>
+              <Text style={styles.buttonText}>{updateAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setEditingAccount(null); setEditEmail(''); setEditPassword(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Tambah Akun */}
       <Modal visible={showAdd} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
@@ -149,7 +225,12 @@ const styles = StyleSheet.create({
   cardPass: { fontSize: 13, color: '#666', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  cardMeta: { fontSize: 12, color: '#888', marginTop: 6 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  cardMeta: { fontSize: 12, color: '#888' },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },

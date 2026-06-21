@@ -38,6 +38,8 @@ export default function ProductsScreen() {
   const [newCatIcon, setNewCatIcon] = useState('');
   const [customName, setCustomName] = useState('');
   const [form, setForm] = useState({ categoryId: '', templateId: '', notes: '' });
+  const [editingApp, setEditingApp] = useState<App | null>(null);
+  const [editNotes, setEditNotes] = useState('');
 
   const { data: apps, isLoading, refetch } = useQuery<App[]>({
     queryKey: ['seller-apps'],
@@ -71,6 +73,25 @@ export default function ProductsScreen() {
       setShowAdd(false);
       setForm({ categoryId: '', templateId: '', notes: '' });
       setCustomName('');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const updateApp = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { notes?: string } }) =>
+      api.patch(`/seller/apps/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
+      setEditingApp(null);
+      setEditNotes('');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const deleteApp = useMutation({
+    mutationFn: (id: string) => api.delete(`/seller/apps/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -125,17 +146,35 @@ export default function ProductsScreen() {
     });
   };
 
+  const handleEditApp = (app: App) => {
+    setEditingApp(app);
+    setEditNotes(app.notes || '');
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingApp) return;
+    updateApp.mutate({ id: editingApp.id, data: { notes: editNotes.trim() || undefined } });
+  };
+
+  const handleDeleteApp = (app: App) => {
+    const appName = app.template?.name || 'aplikasi ini';
+    Alert.alert('Hapus Aplikasi', `Yakin ingin menghapus ${appName}?`, [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: () => deleteApp.mutate(app.id) },
+    ]);
+  };
+
   const sections = useMemo(() => {
     if (!apps) return [];
     const groups: Record<string, { icon?: string; apps: App[] }> = {};
     apps.forEach((app) => {
       const catName = app.template?.category?.name || 'Lainnya';
-      const catIcon = app.template?.category?.icon || '📦';
+      const catIcon = app.template?.category?.icon || '';
       if (!groups[catName]) groups[catName] = { icon: catIcon, apps: [] };
       groups[catName].apps.push(app);
     });
     return Object.entries(groups).map(([title, { icon, apps: data }]) => ({
-      title: `${icon} ${title}`,
+      title: `${icon ? icon + ' ' : ''}${title}`,
       data,
     }));
   }, [apps]);
@@ -170,7 +209,17 @@ export default function ProductsScreen() {
                 })
               }
             >
-              <Text style={styles.cardTitle}>{appName}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{appName}</Text>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity onPress={() => handleEditApp(item)} style={styles.actionBtn}>
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteApp(item)} style={styles.actionBtn}>
+                    <Text style={styles.deleteBtnText}>Hapus</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardMeta}>{durationCount} durasi</Text>
                 <Text style={styles.cardMeta}>{stockCount} stok</Text>
@@ -182,6 +231,35 @@ export default function ProductsScreen() {
           <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada aplikasi'}</Text>
         }
       />
+
+      {/* Modal Edit Aplikasi */}
+      <Modal visible={!!editingApp} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.editModalContent}>
+            <Text style={styles.modalTitle}>Edit Aplikasi</Text>
+            <Text style={styles.label}>Notes</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ketentuan / Notes (opsional)"
+              value={editNotes}
+              onChangeText={setEditNotes}
+              multiline
+            />
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleEditSubmit}
+              disabled={updateApp.isPending}
+            >
+              <Text style={styles.buttonText}>
+                {updateApp.isPending ? 'Menyimpan...' : 'Simpan'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setEditingApp(null); setEditNotes(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal Tambah Aplikasi */}
       <Modal visible={showAdd} animationType="slide" transparent>
@@ -200,7 +278,7 @@ export default function ProductsScreen() {
                   ? `${selectedCategory.icon ? selectedCategory.icon + ' ' : ''}${selectedCategory.name}`
                   : 'Pilih kategori...'}
               </Text>
-              <Text style={styles.dropdownArrow}>{showCatPicker ? '▲' : '▼'}</Text>
+              <Text style={styles.dropdownArrow}>{showCatPicker ? '^' : 'v'}</Text>
             </TouchableOpacity>
 
             {showCatPicker && (
@@ -245,7 +323,7 @@ export default function ProductsScreen() {
                     <View style={styles.addCatRow}>
                       <TextInput
                         style={styles.iconInput}
-                        placeholder="🏷️"
+                        placeholder="icon"
                         value={newCatIcon}
                         onChangeText={setNewCatIcon}
                         maxLength={2}
@@ -287,7 +365,7 @@ export default function ProductsScreen() {
                   <Text style={selectedTemplate ? styles.dropdownText : styles.dropdownPlaceholder}>
                     {selectedTemplate ? selectedTemplate.name : 'Pilih aplikasi...'}
                   </Text>
-                  <Text style={styles.dropdownArrow}>{showTemplatePicker ? '▲' : '▼'}</Text>
+                  <Text style={styles.dropdownArrow}>{showTemplatePicker ? '^' : 'v'}</Text>
                 </TouchableOpacity>
 
                 {showTemplatePicker && (
@@ -383,14 +461,20 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff', borderRadius: 8, padding: 16, marginBottom: 8, elevation: 1,
   },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
-  cardTitle: { fontSize: 16, fontWeight: '600' },
+  cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
   cardMeta: { fontSize: 12, color: '#888' },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
   modalScroll: { maxHeight: '85%', margin: 16 },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, padding: 24 },
+  editModalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500', marginTop: 8 },
   // Dropdown

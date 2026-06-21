@@ -69,6 +69,14 @@ export default function AppDetailScreen() {
     productType: 'AKUN_READY' as ProductType,
     buyerInfoLabel: '',
   });
+  const [editingDuration, setEditingDuration] = useState<Duration | null>(null);
+  const [editForm, setEditForm] = useState({
+    label: '',
+    days: '',
+    basePrice: '',
+    productType: 'AKUN_READY' as ProductType,
+    buyerInfoLabel: '',
+  });
 
   const { data: appDetail, isLoading, refetch } = useQuery<AppDetail>({
     queryKey: ['seller-app', appId],
@@ -112,6 +120,24 @@ export default function AppDetailScreen() {
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
+  const updateDuration = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      api.patch(`/seller/durations/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-app', appId] });
+      setEditingDuration(null);
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const deleteDuration = useMutation({
+    mutationFn: (id: string) => api.delete(`/seller/durations/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-app', appId] });
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
   const handleSubmit = () => {
     if (!form.label.trim()) {
       Alert.alert('Error', 'Label harus diisi');
@@ -136,6 +162,44 @@ export default function AppDetailScreen() {
     });
   };
 
+  const handleEditDuration = (duration: Duration) => {
+    setEditingDuration(duration);
+    setEditForm({
+      label: duration.label,
+      days: String(duration.days),
+      basePrice: String(duration.basePrice),
+      productType: duration.productType,
+      buyerInfoLabel: duration.buyerInfoLabel || '',
+    });
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingDuration) return;
+    if (!editForm.label.trim()) { Alert.alert('Error', 'Label harus diisi'); return; }
+    if (!editForm.days || parseInt(editForm.days) <= 0) { Alert.alert('Error', 'Jumlah hari harus valid'); return; }
+    if (!editForm.basePrice || parseNumber(editForm.basePrice) <= 0) { Alert.alert('Error', 'Harga harus valid'); return; }
+
+    updateDuration.mutate({
+      id: editingDuration.id,
+      data: {
+        label: editForm.label.trim(),
+        days: parseInt(editForm.days),
+        basePrice: parseNumber(editForm.basePrice),
+        productType: editForm.productType,
+        ...(editForm.productType === 'MANUAL' && editForm.buyerInfoLabel.trim()
+          ? { buyerInfoLabel: editForm.buyerInfoLabel.trim() }
+          : { buyerInfoLabel: undefined }),
+      },
+    });
+  };
+
+  const handleDeleteDuration = (duration: Duration) => {
+    Alert.alert('Hapus Durasi', `Yakin ingin menghapus ${duration.label}?`, [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: () => deleteDuration.mutate(duration.id) },
+    ]);
+  };
+
   const durations = appDetail?.durations ?? [];
 
   const sections = useMemo(() => {
@@ -152,7 +216,7 @@ export default function AppDetailScreen() {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-        <Text style={styles.backBtnText}>← Kembali</Text>
+        <Text style={styles.backBtnText}>{'<-'} Kembali</Text>
       </TouchableOpacity>
       <Text style={styles.header}>{appName || appDetail?.template?.name || 'Detail Aplikasi'}</Text>
 
@@ -185,6 +249,14 @@ export default function AppDetailScreen() {
           >
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{item.label}</Text>
+              <View style={styles.actionRow}>
+                <TouchableOpacity onPress={() => handleEditDuration(item)} style={styles.actionBtn}>
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteDuration(item)} style={styles.actionBtn}>
+                  <Text style={styles.deleteBtnText}>Hapus</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.cardPrice}>{formatRupiah(item.basePrice)}</Text>
             <Text style={styles.cardMeta}>
@@ -197,6 +269,72 @@ export default function AppDetailScreen() {
         }
       />
 
+      {/* Modal Edit Durasi */}
+      <Modal visible={!!editingDuration} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Durasi</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder='Label (contoh: "5 Hari", "1 Bulan")'
+              value={editForm.label}
+              onChangeText={(v) => setEditForm({ ...editForm, label: v })}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Jumlah hari"
+              value={editForm.days}
+              onChangeText={(v) => setEditForm({ ...editForm, days: v })}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Harga dasar (Rupiah)"
+              value={formatNumber(editForm.basePrice)}
+              onChangeText={(v) => setEditForm({ ...editForm, basePrice: v.replace(/\./g, '') })}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.label}>Tipe Produk</Text>
+            <View style={styles.typeRow}>
+              {([['AKUN_READY', 'Akun Ready'], ['MANUAL', 'Manual']] as const).map(([val, label]) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[styles.typeChip, editForm.productType === val && styles.typeChipSelected]}
+                  onPress={() => setEditForm({ ...editForm, productType: val as ProductType })}
+                >
+                  <Text style={[styles.typeChipText, editForm.productType === val && styles.typeChipTextSelected]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {editForm.productType === 'MANUAL' && (
+              <TextInput
+                style={styles.input}
+                placeholder="Apa yang harus dikirim pembeli?"
+                value={editForm.buyerInfoLabel}
+                onChangeText={(v) => setEditForm({ ...editForm, buyerInfoLabel: v })}
+              />
+            )}
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleEditSubmit}
+              disabled={updateDuration.isPending}
+            >
+              <Text style={styles.buttonText}>
+                {updateDuration.isPending ? 'Menyimpan...' : 'Simpan'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setEditingDuration(null)}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Tambah Durasi */}
       <Modal visible={showAdd} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
@@ -286,7 +424,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '600' },
+  cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
   badge: {
     backgroundColor: '#e0e7ff',
     paddingHorizontal: 8,

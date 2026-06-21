@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateAppDto } from './dto/create-app.dto';
 import { CreateDurationDto } from './dto/create-duration.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateAppDto } from './dto/update-app.dto';
+import { UpdateDurationDto } from './dto/update-duration.dto';
 
 @Injectable()
 export class CatalogService {
@@ -11,6 +14,7 @@ export class CatalogService {
   async getCategories(sellerId: string) {
     return this.prisma.category.findMany({
       where: {
+        deletedAt: null,
         OR: [{ isDefault: true }, { sellerId }],
       },
       orderBy: { name: 'asc' },
@@ -27,15 +31,44 @@ export class CatalogService {
     });
   }
 
+  async updateCategory(sellerId: string, id: string, dto: UpdateCategoryDto) {
+    const category = await this.prisma.category.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    if (category.sellerId !== sellerId) throw new ForbiddenException('Not your category');
+
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.icon !== undefined ? { icon: dto.icon } : {}),
+      },
+    });
+  }
+
+  async softDeleteCategory(sellerId: string, id: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    if (category.sellerId !== sellerId) throw new ForbiddenException('Not your category');
+
+    return this.prisma.category.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async getTemplates(categoryId: string) {
     return this.prisma.appTemplate.findMany({
-      where: { categoryId },
+      where: { categoryId, deletedAt: null },
       orderBy: { name: 'asc' },
     });
   }
 
   async getApps(sellerId: string, categoryId?: string) {
-    const where: any = { sellerId };
+    const where: any = { sellerId, deletedAt: null };
     if (categoryId) where.template = { categoryId };
 
     const apps = await this.prisma.app.findMany({
@@ -49,7 +82,7 @@ export class CatalogService {
           },
         },
         durations: {
-          where: { active: true },
+          where: { active: true, deletedAt: null },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -60,8 +93,10 @@ export class CatalogService {
         const stockCount = await this.prisma.subAccount.count({
           where: {
             status: 'AVAILABLE',
+            deletedAt: null,
             account: {
-              duration: { appId: app.id },
+              deletedAt: null,
+              duration: { appId: app.id, deletedAt: null },
             },
           },
         });
@@ -123,16 +158,44 @@ export class CatalogService {
     });
   }
 
+  async updateApp(sellerId: string, id: string, dto: UpdateAppDto) {
+    const app = await this.prisma.app.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    if (app.sellerId !== sellerId) throw new ForbiddenException('Not your app');
+
+    return this.prisma.app.update({
+      where: { id },
+      data: {
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+      },
+    });
+  }
+
+  async softDeleteApp(sellerId: string, id: string) {
+    const app = await this.prisma.app.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!app) throw new NotFoundException('App not found');
+    if (app.sellerId !== sellerId) throw new ForbiddenException('Not your app');
+
+    return this.prisma.app.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async getDurations(appId: string) {
     return this.prisma.duration.findMany({
-      where: { appId, active: true },
+      where: { appId, active: true, deletedAt: null },
       orderBy: { days: 'asc' },
     });
   }
 
   async createDuration(sellerId: string, appId: string, dto: CreateDurationDto) {
     const app = await this.prisma.app.findFirst({
-      where: { id: appId, sellerId },
+      where: { id: appId, sellerId, deletedAt: null },
     });
     if (!app) {
       throw new NotFoundException('App not found');
@@ -150,6 +213,40 @@ export class CatalogService {
     });
   }
 
+  async updateDuration(sellerId: string, id: string, dto: UpdateDurationDto) {
+    const duration = await this.prisma.duration.findFirst({
+      where: { id, deletedAt: null },
+      include: { app: { select: { sellerId: true } } },
+    });
+    if (!duration) throw new NotFoundException('Duration not found');
+    if (duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your duration');
+
+    return this.prisma.duration.update({
+      where: { id },
+      data: {
+        ...(dto.label !== undefined ? { label: dto.label } : {}),
+        ...(dto.days !== undefined ? { days: dto.days } : {}),
+        ...(dto.basePrice !== undefined ? { basePrice: dto.basePrice } : {}),
+        ...(dto.productType !== undefined ? { productType: dto.productType as any } : {}),
+        ...(dto.buyerInfoLabel !== undefined ? { buyerInfoLabel: dto.buyerInfoLabel } : {}),
+      },
+    });
+  }
+
+  async softDeleteDuration(sellerId: string, id: string) {
+    const duration = await this.prisma.duration.findFirst({
+      where: { id, deletedAt: null },
+      include: { app: { select: { sellerId: true } } },
+    });
+    if (!duration) throw new NotFoundException('Duration not found');
+    if (duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your duration');
+
+    return this.prisma.duration.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async getAppWithStock(appId: string) {
     const app = await this.prisma.app.findUnique({
       where: { id: appId },
@@ -162,7 +259,7 @@ export class CatalogService {
           },
         },
         durations: {
-          where: { active: true },
+          where: { active: true, deletedAt: null },
         },
       },
     });
@@ -174,7 +271,7 @@ export class CatalogService {
     const durationsWithStock = await Promise.all(
       app.durations.map(async (d) => {
         const stockCount = await this.prisma.subAccount.count({
-          where: { status: 'AVAILABLE', account: { durationId: d.id } },
+          where: { status: 'AVAILABLE', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
         });
         return {
           id: d.id,

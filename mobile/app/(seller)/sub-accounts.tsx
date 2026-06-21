@@ -28,6 +28,9 @@ export default function SubAccountsScreen() {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
+  const [editingSubAccount, setEditingSubAccount] = useState<SubAccount | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPin, setEditPin] = useState('');
 
   const { data: subAccounts, isLoading, refetch } = useQuery<SubAccount[]>({
     queryKey: ['seller-sub-accounts', accountId],
@@ -67,10 +70,54 @@ export default function SubAccountsScreen() {
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
+  const updateSubAccount = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; pin?: string } }) =>
+      api.patch(`/seller/sub-accounts/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sub-accounts', accountId] });
+      setEditingSubAccount(null);
+      setEditName('');
+      setEditPin('');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const deleteSubAccount = useMutation({
+    mutationFn: (id: string) => api.delete(`/seller/sub-accounts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sub-accounts', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
   const handleSubmit = () => {
     if (!name.trim()) { Alert.alert('Error', 'Nama sub-akun harus diisi'); return; }
     if (!pin.trim()) { Alert.alert('Error', 'PIN harus diisi'); return; }
     addSubAccount.mutate();
+  };
+
+  const handleEditSubAccount = (subAccount: SubAccount) => {
+    setEditingSubAccount(subAccount);
+    setEditName(subAccount.name);
+    setEditPin(subAccount.pin);
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingSubAccount) return;
+    if (!editName.trim()) { Alert.alert('Error', 'Nama sub-akun harus diisi'); return; }
+    if (!editPin.trim()) { Alert.alert('Error', 'PIN harus diisi'); return; }
+    updateSubAccount.mutate({
+      id: editingSubAccount.id,
+      data: { name: editName.trim(), pin: editPin.trim() },
+    });
+  };
+
+  const handleDeleteSubAccount = (subAccount: SubAccount) => {
+    Alert.alert('Hapus Sub-Akun', `Yakin ingin menghapus ${subAccount.name}?`, [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: () => deleteSubAccount.mutate(subAccount.id) },
+    ]);
   };
 
   const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : '#f59e0b';
@@ -78,7 +125,7 @@ export default function SubAccountsScreen() {
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={handleBack}>
-        <Text style={styles.backBtn}>← Kembali</Text>
+        <Text style={styles.backBtn}>{'<-'} Kembali</Text>
       </TouchableOpacity>
 
       <Text style={styles.header}>Sub-Akun</Text>
@@ -103,9 +150,19 @@ export default function SubAccountsScreen() {
                 <Text style={styles.badgeText}>{item.status}</Text>
               </View>
             </View>
-            <Text style={styles.cardMeta}>
-              {new Date(item.createdAt).toLocaleDateString('id-ID')}
-            </Text>
+            <View style={styles.cardFooter}>
+              <Text style={styles.cardMeta}>
+                {new Date(item.createdAt).toLocaleDateString('id-ID')}
+              </Text>
+              <View style={styles.actionRow}>
+                <TouchableOpacity onPress={() => handleEditSubAccount(item)} style={styles.actionBtn}>
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteSubAccount(item)} style={styles.actionBtn}>
+                  <Text style={styles.deleteBtnText}>Hapus</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
         ListEmptyComponent={
@@ -113,6 +170,26 @@ export default function SubAccountsScreen() {
         }
       />
 
+      {/* Modal Edit Sub-Akun */}
+      <Modal visible={!!editingSubAccount} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Sub-Akun</Text>
+            <TextInput style={styles.input} placeholder="Nama profil / sub-akun"
+              value={editName} onChangeText={setEditName} />
+            <TextInput style={styles.input} placeholder="PIN"
+              value={editPin} onChangeText={setEditPin} keyboardType="numeric" />
+            <TouchableOpacity style={styles.button} onPress={handleEditSubmit} disabled={updateSubAccount.isPending}>
+              <Text style={styles.buttonText}>{updateSubAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setEditingSubAccount(null); setEditName(''); setEditPin(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Tambah Sub-Akun */}
       <Modal visible={showAdd} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
@@ -147,7 +224,12 @@ const styles = StyleSheet.create({
   cardPin: { fontSize: 13, color: '#666', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  cardMeta: { fontSize: 12, color: '#888', marginTop: 6 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  cardMeta: { fontSize: 12, color: '#888' },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },

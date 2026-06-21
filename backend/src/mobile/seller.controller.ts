@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -22,6 +24,11 @@ import { SetStoreCodeDto } from '../seller/dto/set-store-code.dto';
 import { CreateCategoryDto } from '../catalog/dto/create-category.dto';
 import { CreateAppDto } from '../catalog/dto/create-app.dto';
 import { CreateDurationDto } from '../catalog/dto/create-duration.dto';
+import { UpdateCategoryDto } from '../catalog/dto/update-category.dto';
+import { UpdateAppDto } from '../catalog/dto/update-app.dto';
+import { UpdateDurationDto } from '../catalog/dto/update-duration.dto';
+import { UpdateAccountDto } from '../stock/dto/update-account.dto';
+import { UpdateSubAccountDto } from '../stock/dto/update-sub-account.dto';
 import { AddAccountDto } from '../stock/dto/add-account.dto';
 import { AddSubAccountDto } from '../stock/dto/add-sub-account.dto';
 import { OrderService } from '../order/order.service';
@@ -78,6 +85,18 @@ export class SellerController {
     return this.catalogService.createCategory(req.seller.id, dto);
   }
 
+  @Patch('categories/:id')
+  @UseGuards(ActiveSellerGuard)
+  async updateCategory(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.catalogService.updateCategory(req.seller.id, id, dto);
+  }
+
+  @Delete('categories/:id')
+  @UseGuards(ActiveSellerGuard)
+  async deleteCategory(@Req() req: any, @Param('id') id: string) {
+    return this.catalogService.softDeleteCategory(req.seller.id, id);
+  }
+
   // --- Template endpoints ---
 
   @Get('templates')
@@ -104,6 +123,18 @@ export class SellerController {
     return this.catalogService.getAppWithStock(id);
   }
 
+  @Patch('apps/:id')
+  @UseGuards(ActiveSellerGuard)
+  async updateApp(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateAppDto) {
+    return this.catalogService.updateApp(req.seller.id, id, dto);
+  }
+
+  @Delete('apps/:id')
+  @UseGuards(ActiveSellerGuard)
+  async deleteApp(@Req() req: any, @Param('id') id: string) {
+    return this.catalogService.softDeleteApp(req.seller.id, id);
+  }
+
   // --- Duration endpoints ---
 
   @Post('apps/:appId/durations')
@@ -114,6 +145,18 @@ export class SellerController {
     @Body() dto: CreateDurationDto,
   ) {
     return this.catalogService.createDuration(req.seller.id, appId, dto);
+  }
+
+  @Patch('durations/:id')
+  @UseGuards(ActiveSellerGuard)
+  async updateDuration(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateDurationDto) {
+    return this.catalogService.updateDuration(req.seller.id, id, dto);
+  }
+
+  @Delete('durations/:id')
+  @UseGuards(ActiveSellerGuard)
+  async deleteDuration(@Req() req: any, @Param('id') id: string) {
+    return this.catalogService.softDeleteDuration(req.seller.id, id);
   }
 
   // --- Account/Stock endpoints ---
@@ -137,6 +180,18 @@ export class SellerController {
     return this.stockService.listAccounts(seller.id, durationId);
   }
 
+  @Patch('accounts/:id')
+  @UseGuards(ActiveSellerGuard)
+  async updateAccount(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateAccountDto) {
+    return this.stockService.updateAccount(req.seller.id, id, dto);
+  }
+
+  @Delete('accounts/:id')
+  @UseGuards(ActiveSellerGuard)
+  async deleteAccount(@Req() req: any, @Param('id') id: string) {
+    return this.stockService.softDeleteAccount(req.seller.id, id);
+  }
+
   @Post('accounts/:accountId/sub-accounts')
   @UseGuards(ActiveSellerGuard)
   addSubAccount(
@@ -150,6 +205,18 @@ export class SellerController {
   @Get('accounts/:accountId/sub-accounts')
   async listSubAccounts(@Param('accountId') accountId: string) {
     return this.stockService.listSubAccounts(accountId);
+  }
+
+  @Patch('sub-accounts/:id')
+  @UseGuards(ActiveSellerGuard)
+  async updateSubAccount(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateSubAccountDto) {
+    return this.stockService.updateSubAccount(req.seller.id, id, dto);
+  }
+
+  @Delete('sub-accounts/:id')
+  @UseGuards(ActiveSellerGuard)
+  async deleteSubAccount(@Req() req: any, @Param('id') id: string) {
+    return this.stockService.softDeleteSubAccount(req.seller.id, id);
   }
 
   // --- Balance/Sales ---
