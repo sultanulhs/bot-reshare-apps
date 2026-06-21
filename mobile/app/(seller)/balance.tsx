@@ -5,6 +5,15 @@ import api from '../../src/lib/api';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
+const STATUS_FILTERS = [
+  { key: null, letter: 'A', label: 'Semua', color: '#6b7280' },
+  { key: 'PENDING', letter: 'P', label: 'Pending', color: '#f59e0b' },
+  { key: 'FULFILLED', letter: 'F', label: 'Fulfilled', color: '#16a34a' },
+  { key: 'EXPIRED', letter: 'E', label: 'Expired', color: '#ef4444' },
+  { key: 'WAITING_SELLER', letter: 'W', label: 'Waiting', color: '#f59e0b' },
+  { key: 'FAILED', letter: 'X', label: 'Failed', color: '#ef4444' },
+] as const;
+
 export default function BalanceScreen() {
   const queryClient = useQueryClient();
   const now = new Date();
@@ -22,6 +31,7 @@ export default function BalanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -36,9 +46,11 @@ export default function BalanceScreen() {
     if (!sales) return [];
     return sales.filter((s: any) => {
       const d = new Date(s.createdAt);
-      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      if (d.getMonth() !== selectedMonth || d.getFullYear() !== selectedYear) return false;
+      if (selectedStatus && s.status !== selectedStatus) return false;
+      return true;
     });
-  }, [sales, selectedMonth, selectedYear]);
+  }, [sales, selectedMonth, selectedYear, selectedStatus]);
 
   return (
     <View style={styles.container}>
@@ -50,6 +62,14 @@ export default function BalanceScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
+        <View style={styles.statusFilterRow}>
+          {STATUS_FILTERS.map((sf) => (
+            <TouchableOpacity key={sf.letter} onPress={() => setSelectedStatus(sf.key)}
+              style={[styles.statusDot, { backgroundColor: selectedStatus === sf.key ? sf.color : '#e5e7eb' }]}>
+              <Text style={[styles.statusDotText, { color: selectedStatus === sf.key ? '#fff' : sf.color }]}>{sf.letter}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <View style={styles.yearPicker}>
           <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
             <Text style={styles.yearArrowText}>{'<'}</Text>
@@ -119,8 +139,11 @@ const styles = StyleSheet.create({
   label: { color: '#ddd', fontSize: 14 },
   amount: { color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 4 },
   note: { color: '#bbb', fontSize: 12, marginTop: 8 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
+  statusFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statusDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  statusDotText: { fontSize: 12, fontWeight: '800' },
   yearPicker: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, elevation: 1 },
   yearArrow: { paddingHorizontal: 10, paddingVertical: 4 },
   yearArrowText: { fontSize: 16, fontWeight: '700', color: '#2563eb' },
