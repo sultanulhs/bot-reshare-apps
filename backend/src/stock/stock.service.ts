@@ -16,6 +16,20 @@ export class StockService {
     private readonly telegramService: TelegramService,
   ) {}
 
+  private buildCredentialMessage(
+    packageName: string,
+    email: string,
+    password: string,
+    subName?: string,
+    pin?: string,
+  ): string {
+    let msg = `⚠️ Info: Kredensial *${packageName}* telah diperbarui.\n📧 Email: ${email}\n🔑 Password: ${password}`;
+    if (subName) {
+      msg += `\n👤 Profil: ${subName}\n🔐 PIN: ${pin}`;
+    }
+    return msg;
+  }
+
   async addAccount(sellerId: string, durationId: string, dto: AddAccountDto) {
     const duration = await this.prisma.duration.findFirst({
       where: { id: durationId, deletedAt: null, app: { sellerId, deletedAt: null } },
@@ -179,7 +193,7 @@ export class StockService {
 
     const updated = await this.prisma.account.update({ where: { id }, data });
 
-    // Notify active (non-expired) buyers if account has fulfilled orders via sub-accounts
+    // Notify active (non-expired) buyers with full credential details
     try {
       const activeOrders = await this.prisma.order.findMany({
         where: {
@@ -190,16 +204,25 @@ export class StockService {
             { accessExpiresAt: { gt: new Date() } },
           ],
         },
+        include: {
+          subAccount: true,
+          duration: { include: { app: { include: { template: true } } } },
+        },
       });
       if (activeOrders.length > 0) {
         const newEmail = dto.email || this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
         const newPassword = dto.password || this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
         for (const activeOrder of activeOrders) {
           try {
-            await this.telegramService.bot.api.sendMessage(
-              activeOrder.buyerTgUserId.toString(),
-              `⚠️ Info: Kredensial akun yang kamu beli telah diperbarui.\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword}`,
-            );
+            const packageName = activeOrder.duration?.app?.template?.name ?? 'Akun';
+            let subName: string | undefined;
+            let subPin: string | undefined;
+            if (activeOrder.subAccount) {
+              subName = this.crypto.decrypt(activeOrder.subAccount.encName, activeOrder.subAccount.nameIv, activeOrder.subAccount.nameTag);
+              subPin = this.crypto.decrypt(activeOrder.subAccount.encPin, activeOrder.subAccount.pinIv, activeOrder.subAccount.pinTag);
+            }
+            const msg = this.buildCredentialMessage(packageName, newEmail, newPassword, subName, subPin);
+            await this.telegramService.bot.api.sendMessage(activeOrder.buyerTgUserId.toString(), msg);
           } catch { /* ignore per-buyer failure */ }
         }
       }
@@ -252,10 +275,18 @@ export class StockService {
   async updateSubAccount(sellerId: string, id: string, dto: UpdateSubAccountDto) {
     const subAccount = await this.prisma.subAccount.findFirst({
       where: { id, deletedAt: null },
-      include: { account: { include: { duration: { include: { app: { select: { sellerId: true } } } } } } },
+      include: { account: true },
     });
     if (!subAccount) throw new NotFoundException('Sub-account not found');
-    if (subAccount.account.duration.app.sellerId !== sellerId) throw new ForbiddenException('Not your sub-account');
+
+    // Check ownership via duration → app → seller
+    const accountWithSeller = await this.prisma.account.findFirst({
+      where: { id: subAccount.accountId },
+      include: { duration: { include: { app: { select: { sellerId: true } } } } },
+    });
+    if (!accountWithSeller || accountWithSeller.duration.app.sellerId !== sellerId) {
+      throw new ForbiddenException('Not your sub-account');
+    }
 
     const data: any = {};
     if (dto.name !== undefined) {
@@ -272,6 +303,32 @@ export class StockService {
     }
 
     const updated = await this.prisma.subAccount.update({ where: { id }, data });
+
+    // Notify active (non-expired) buyer with full credential details
+    try {
+      const activeOrder = await this.prisma.order.findFirst({
+        where: {
+          subAccountId: id,
+          status: 'FULFILLED',
+          OR: [
+            { accessExpiresAt: null },
+            { accessExpiresAt: { gt: new Date() } },
+          ],
+        },
+        include: { duration: { include: { app: { include: { template: true } } } } },
+      });
+      if (activeOrder) {
+        const email = this.crypto.decrypt(subAccount.account.encEmail, subAccount.account.emailIv, subAccount.account.emailTag);
+        const password = this.crypto.decrypt(subAccount.account.encPassword, subAccount.account.passwordIv, subAccount.account.passwordTag);
+        const newName = dto.name || this.crypto.decrypt(subAccount.encName, subAccount.nameIv, subAccount.nameTag);
+        const newPin = dto.pin || this.crypto.decrypt(subAccount.encPin, subAccount.pinIv, subAccount.pinTag);
+        const packageName = activeOrder.duration?.app?.template?.name ?? 'Akun';
+        const msg = this.buildCredentialMessage(packageName, email, password, newName, newPin);
+        await this.telegramService.bot.api.sendMessage(activeOrder.buyerTgUserId.toString(), msg);
+      }
+    } catch {
+      // Silently ignore notification failures
+    }
 
     // Reset stock if sub-account's order is expired and credentials were changed
     const expiredOrder = await this.prisma.order.findFirst({

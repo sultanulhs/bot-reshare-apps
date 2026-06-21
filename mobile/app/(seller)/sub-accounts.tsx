@@ -163,7 +163,7 @@ export default function SubAccountsScreen() {
                 )}
                 {item.accessExpiresAt && item.status === 'SOLD' && (
                   <Text style={styles.expiryDate}>
-                    Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleDateString('id-ID')}
+                    Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                   </Text>
                 )}
               </View>
