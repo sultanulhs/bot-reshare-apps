@@ -40,8 +40,6 @@ export class LedgerService {
       productTitle: o.duration?.app?.template?.name ?? 'Unknown',
       durationLabel: o.duration?.label ?? null,
       status: o.status,
-      basePrice: o.basePrice,
-      markup: o.markup,
       totalAmount: o.totalAmount,
       buyerName: o.buyerName ?? null,
       buyerUsername: o.buyerUsername ?? null,

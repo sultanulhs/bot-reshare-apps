@@ -60,6 +60,7 @@ export class OrderService {
             deletedAt: null,
             account: { durationId: duration.id, deletedAt: null },
           },
+          orderBy: { createdAt: 'asc' },
         });
         if (!sub) {
           throw new BadRequestException('No stock available');
@@ -134,17 +135,12 @@ export class OrderService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'EXPIRED' },
-      });
-
+      // Release stock first, then null-out FKs so sub-account can be reused
       if (order.accountId) {
         await tx.account.update({
           where: { id: order.accountId },
           data: { status: 'AVAILABLE' },
         });
-        // Release sub-accounts too
         await tx.subAccount.updateMany({
           where: { accountId: order.accountId },
           data: { status: 'AVAILABLE' },
@@ -157,6 +153,12 @@ export class OrderService {
           data: { status: 'AVAILABLE' },
         });
       }
+
+      // Null-out FKs so the unique constraint is freed for reuse
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'EXPIRED', subAccountId: null, accountId: null },
+      });
     });
   }
 

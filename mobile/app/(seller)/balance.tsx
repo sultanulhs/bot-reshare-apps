@@ -59,11 +59,7 @@ export default function BalanceScreen() {
                 </View>
               </View>
               <Text style={styles.cardBuyer}>👤 {buyerLabel}</Text>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceDetail}>Harga Rp{item.basePrice.toLocaleString('id-ID')}</Text>
-                <Text style={styles.priceDetail}> + Markup Rp{item.markup.toLocaleString('id-ID')}</Text>
-                <Text style={styles.priceTotal}> = Rp{item.totalAmount.toLocaleString('id-ID')}</Text>
-              </View>
+              <Text style={styles.priceTotal}>💰 Rp{item.totalAmount.toLocaleString('id-ID')}</Text>
               <Text style={styles.cardDate}>📅 Pesan: {fmtDate(item.createdAt)}</Text>
               {item.fulfilledAt && <Text style={styles.cardDate}>✅ Selesai: {fmtDate(item.fulfilledAt)}</Text>}
               {item.accessExpiresAt && <Text style={styles.cardDate}>⏰ Berlaku s/d: {fmtDate(item.accessExpiresAt)}</Text>}
@@ -89,9 +85,7 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   cardBuyer: { fontSize: 12, color: '#555', marginBottom: 4 },
-  priceRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
-  priceDetail: { fontSize: 12, color: '#888' },
-  priceTotal: { fontSize: 12, fontWeight: '600', color: '#111' },
+  priceTotal: { fontSize: 13, fontWeight: '600', color: '#111', marginBottom: 4 },
   cardDate: { fontSize: 11, color: '#999', marginTop: 1 },
   empty: { textAlign: 'center', color: '#999', marginTop: 24 },
 });

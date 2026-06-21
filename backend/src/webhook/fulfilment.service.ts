@@ -43,6 +43,14 @@ export class FulfilmentService {
 
     if (order.status !== 'PENDING') {
       this.logger.log(`Order ${order.id} already ${order.status}, skipping`);
+      if (order.status === 'EXPIRED') {
+        try {
+          await this.telegram.bot.api.sendMessage(
+            order.buyerTgUserId.toString(),
+            `❌ Pesanan sudah kedaluwarsa. Silakan buat pesanan baru.`,
+          );
+        } catch {}
+      }
       return;
     }
 

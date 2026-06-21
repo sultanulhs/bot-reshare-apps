@@ -257,6 +257,13 @@ export function createBuyerComposer(
     const partnerReferenceNo = ctx.match![1];
 
     try {
+      // Check if order is still PENDING before processing
+      const order = await prisma.order.findFirst({ where: { partnerReferenceNo } });
+      if (!order || order.status !== 'PENDING') {
+        await ctx.reply('❌ Pesanan sudah kedaluwarsa atau tidak ditemukan. Silakan buat pesanan baru.');
+        return;
+      }
+
       await fulfilmentService.handlePaymentNotification({
         originalPartnerReferenceNo: partnerReferenceNo,
       });
