@@ -260,8 +260,17 @@ model Order {
   fulfilledAt        DateTime?
   accessExpiresAt    DateTime?
   reminderEnabled    Boolean       @default(false)
+  messages           OrderMessage[]
   ledgerEntries      LedgerEntry[]
   reports            Report[]
+}
+
+model OrderMessage {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
 }
 
 model LedgerEntry {

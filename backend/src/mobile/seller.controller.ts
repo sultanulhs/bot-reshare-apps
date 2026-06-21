@@ -257,6 +257,12 @@ export class SellerController {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
   }
 
+  @Get('orders/:id/messages')
+  @UseGuards(ActiveSellerGuard)
+  async getOrderMessages(@Req() req: any, @Param('id') id: string) {
+    return this.orderService.getOrderMessages(req.seller.id, id);
+  }
+
   @Post('orders/:id/message')
   @UseGuards(ActiveSellerGuard)
   async sendMessageToBuyer(

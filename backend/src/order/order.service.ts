@@ -315,6 +315,8 @@ export class OrderService implements OnModuleInit {
           amount: order.markup,
         },
       });
+
+      await tx.orderMessage.create({ data: { orderId, message: credentials } });
     });
 
     try {
@@ -345,6 +347,7 @@ export class OrderService implements OnModuleInit {
       order.buyerTgUserId.toString(),
       `📢 Pesan dari penjual:\n\n${message}`,
     );
+    await this.prisma.orderMessage.create({ data: { orderId, message } });
     return { success: true };
   }
 
@@ -362,5 +365,20 @@ export class OrderService implements OnModuleInit {
       data: { reminderEnabled: enabled },
     });
     return { success: true, reminderEnabled: enabled };
+  }
+
+  async getOrderMessages(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order) throw new BadRequestException('Order not found');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order does not belong to this seller');
+    }
+    return this.prisma.orderMessage.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }

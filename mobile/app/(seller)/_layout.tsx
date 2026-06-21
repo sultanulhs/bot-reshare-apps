@@ -10,6 +10,7 @@ export default function SellerLayout() {
       <Tabs.Screen name="app-detail" options={{ href: null, title: 'Detail Aplikasi' }} />
       <Tabs.Screen name="add-account" options={{ href: null, title: 'Kelola Akun' }} />
       <Tabs.Screen name="sub-accounts" options={{ href: null, title: 'Sub-Akun' }} />
+      <Tabs.Screen name="order-messages" options={{ href: null, title: 'Pesan Pesanan' }} />
       <Tabs.Screen name="submit-profile" options={{ href: null }} />
       <Tabs.Screen name="verify-email" options={{ href: null, title: 'Verifikasi Email' }} />
       <Tabs.Screen name="verify-phone" options={{ href: null, title: 'Verifikasi HP' }} />

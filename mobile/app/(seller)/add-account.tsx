@@ -57,8 +57,6 @@ export default function AddAccountScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newHasSubAccounts, setNewHasSubAccounts] = useState(true);
-  const [messageOrderId, setMessageOrderId] = useState<string | null>(null);
-  const [messageText, setMessageText] = useState('');
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -120,13 +118,6 @@ export default function AddAccountScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
     },
-    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
-  });
-
-  const sendMessage = useMutation({
-    mutationFn: ({ orderId, message }: { orderId: string; message: string }) =>
-      api.post(`/seller/orders/${orderId}/message`, { message }),
-    onSuccess: () => { setMessageOrderId(null); setMessageText(''); Alert.alert('Berhasil', 'Pesan terkirim'); },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
@@ -320,7 +311,10 @@ export default function AddAccountScreen() {
                   {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (
                     <>
                       <View style={styles.actionInlineRow}>
-                        <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
+                        <TouchableOpacity style={styles.sendMsgBtn} onPress={() => router.push({
+                          pathname: '/(seller)/order-messages',
+                          params: { orderId: order.id, appName: appName || '', durationLabel: durationLabel || '', buyerName: buyerLabel, durationId: durationId!, appId: appId! },
+                        })}>
                           <Text style={styles.sendMsgBtnText}>📨 Kirim Pesan</Text>
                         </TouchableOpacity>
                         <View style={styles.reminderInline}>
@@ -392,32 +386,6 @@ export default function AddAccountScreen() {
         </View>
       </Modal>
 
-      {/* Modal Kirim Pesan */}
-      <Modal visible={!!messageOrderId} animationType="slide" transparent>
-        <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Kirim Pesan ke Pembeli</Text>
-            <TextInput
-              style={[styles.input, { height: 100 }]}
-              placeholder="Tulis pesan..."
-              value={messageText}
-              onChangeText={setMessageText}
-              multiline
-              textAlignVertical="top"
-            />
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => messageOrderId && sendMessage.mutate({ orderId: messageOrderId, message: messageText })}
-              disabled={sendMessage.isPending}
-            >
-              <Text style={styles.buttonText}>{sendMessage.isPending ? 'Mengirim...' : 'Kirim'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setMessageOrderId(null); setMessageText(''); }}>
-              <Text style={styles.cancel}>Batal</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
