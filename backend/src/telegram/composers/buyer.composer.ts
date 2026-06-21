@@ -492,7 +492,7 @@ export function createBuyerComposer(
 
     try {
       await orderService.submitWarrantyPhoto(BigInt(ctx.from.id), orderId, fileId);
-      await ctx.reply('\u{2705} Garansi berhasil diaktifkan! Screenshot login kamu telah tersimpan.');
+      await ctx.reply('\u{1F4F8} Foto garansi telah dikirim. Menunggu verifikasi dari penjual.');
     } catch (err: any) {
       await ctx.reply(`\u{274C} Gagal aktivasi garansi: ${err.message}`);
     }

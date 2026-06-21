@@ -130,6 +130,15 @@ export default function AddAccountScreen() {
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
+  const verifyWarranty = useMutation({
+    mutationFn: ({ orderId, approved }: { orderId: string; approved: boolean }) =>
+      api.post(`/seller/orders/${orderId}/warranty-verify`, { approved }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
   const toggleReminder = useMutation({
     mutationFn: ({ orderId, enabled }: { orderId: string; enabled: boolean }) =>
       api.patch(`/seller/orders/${orderId}/reminder`, { enabled }),
@@ -228,11 +237,28 @@ export default function AddAccountScreen() {
             {item.warrantyStatus && (
               <Text style={{
                 fontSize: 12, marginTop: 4, fontWeight: '600',
-                color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
               }}>
-                {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                {item.warrantyPhoto && ' \u{1F4F8}'}
+                {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
+                {item.warrantyPhoto && item.warrantyStatus !== 'SUBMITTED' && ' \u{1F4F8}'}
               </Text>
+            )}
+            {item.warrantyStatus === 'SUBMITTED' && item.orderId && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#16a34a', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                  onPress={() => verifyWarranty.mutate({ orderId: item.orderId!, approved: true })}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Setujui</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#ef4444', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                  onPress={() => Alert.alert('Tolak Garansi', 'Yakin ingin menolak? Pembeli bisa kirim ulang foto.', [
+                    { text: 'Batal', style: 'cancel' },
+                    { text: 'Tolak', style: 'destructive', onPress: () => verifyWarranty.mutate({ orderId: item.orderId!, approved: false }) },
+                  ])}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{274C}'} Tolak</Text>
+                </TouchableOpacity>
+              </View>
             )}
             {(item.expiredCount ?? 0) > 0 && (
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
@@ -353,11 +379,28 @@ export default function AddAccountScreen() {
                   {order.warrantyStatus && (
                     <Text style={{
                       fontSize: 12, marginTop: 4, fontWeight: '600',
-                      color: order.warrantyStatus === 'ACTIVE' ? '#16a34a' : order.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                      color: order.warrantyStatus === 'ACTIVE' ? '#16a34a' : order.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : order.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                     }}>
-                      {order.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : order.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                      {order.warrantyPhoto && ' \u{1F4F8}'}
+                      {order.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : order.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : order.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
+                      {order.warrantyPhoto && order.warrantyStatus !== 'SUBMITTED' && ' \u{1F4F8}'}
                     </Text>
+                  )}
+                  {order.warrantyStatus === 'SUBMITTED' && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#16a34a', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                        onPress={() => verifyWarranty.mutate({ orderId: order.id, approved: true })}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Setujui</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#ef4444', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                        onPress={() => Alert.alert('Tolak Garansi', 'Yakin ingin menolak? Pembeli bisa kirim ulang foto.', [
+                          { text: 'Batal', style: 'cancel' },
+                          { text: 'Tolak', style: 'destructive', onPress: () => verifyWarranty.mutate({ orderId: order.id, approved: false }) },
+                        ])}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{274C}'} Tolak</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               );

@@ -400,8 +400,48 @@ export class OrderService implements OnModuleInit {
     }
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { warrantyStatus: 'ACTIVE', warrantyPhoto: fileId, warrantyAt: new Date() },
+      data: { warrantyStatus: 'SUBMITTED', warrantyPhoto: fileId, warrantyAt: new Date() },
     });
+    return { success: true };
+  }
+
+  async verifyWarranty(sellerId: string, orderId: string, approved: boolean) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order) throw new BadRequestException('Order not found');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order does not belong to this seller');
+    }
+    if (order.warrantyStatus !== 'SUBMITTED') {
+      throw new BadRequestException('Warranty is not awaiting verification');
+    }
+
+    if (approved) {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { warrantyStatus: 'ACTIVE' },
+      });
+      try {
+        await this.telegramService.bot.api.sendMessage(
+          order.buyerTgUserId.toString(),
+          '\u{2705} Garansi kamu telah diverifikasi dan aktif!',
+        );
+      } catch {}
+    } else {
+      // Reset to PENDING so buyer can re-submit
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { warrantyStatus: 'PENDING', warrantyPhoto: null, warrantyAt: null },
+      });
+      try {
+        await this.telegramService.bot.api.sendMessage(
+          order.buyerTgUserId.toString(),
+          '\u{274C} Foto garansi kamu ditolak. Silakan kirim ulang foto screenshot login yang benar melalui menu \u{1F6E1}\u{FE0F} Garansi.',
+        );
+      } catch {}
+    }
     return { success: true };
   }
 

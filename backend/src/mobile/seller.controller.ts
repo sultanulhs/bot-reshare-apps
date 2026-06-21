@@ -328,6 +328,16 @@ export class SellerController {
     res.send(Buffer.from(buffer));
   }
 
+  @Post('orders/:id/warranty-verify')
+  @UseGuards(ActiveSellerGuard)
+  async verifyWarranty(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { approved: boolean },
+  ) {
+    return this.orderService.verifyWarranty(req.seller.id, id, body.approved);
+  }
+
   @Post('store-code')
   setStoreCode(@Req() req: any, @Body() dto: SetStoreCodeDto) {
     return this.sellerService.setStoreCode(req.user.sub, dto.storeCode);
