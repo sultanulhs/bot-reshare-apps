@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -313,8 +314,14 @@ export class SellerController {
   }
 
   @Patch('warranty')
-  async updateWarranty(@Req() req: any, @Body() body: { hours: number | null }) {
-    return this.sellerService.updateWarrantyHours(req.user.sub, body.hours);
+  async updateWarranty(@Req() req: any, @Body() body: { hours: any }) {
+    const hours = body.hours === null || body.hours === '' || body.hours === undefined
+      ? null
+      : Number(body.hours);
+    if (hours !== null && (isNaN(hours) || hours < 1)) {
+      throw new BadRequestException('Masukkan jumlah jam yang valid (minimal 1)');
+    }
+    return this.sellerService.updateWarrantyHours(req.user.sub, hours);
   }
 
   @Get('orders/:id/warranty-photo')
