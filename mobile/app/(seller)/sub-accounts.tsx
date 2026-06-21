@@ -189,7 +189,9 @@ export default function SubAccountsScreen() {
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
-          <View style={[styles.card, item.isExpired && styles.cardExpired]}>
+          <View style={[styles.card, item.isExpired && styles.cardExpired, {
+            ...(item.warrantyStatus === 'SUBMITTED' ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+          }]}>
             <View style={styles.cardRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName}>{item.name}</Text>

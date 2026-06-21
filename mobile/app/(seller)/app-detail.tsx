@@ -250,9 +250,14 @@ export default function AppDetailScreen() {
         renderSectionHeader={({ section: { title } }) => (
           <Text style={styles.sectionHeader}>{title}</Text>
         )}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const cardBorderStyle = {
+            ...((item.expiredCount ?? 0) > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
+            ...((item.pendingWarrantyCount ?? 0) > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+          };
+          return (
           <TouchableOpacity
-            style={[styles.card, (item.expiredCount ?? 0) > 0 ? styles.cardExpired : (item.pendingWarrantyCount ?? 0) > 0 && styles.cardWarrantyPending]}
+            style={[styles.card, cardBorderStyle]}
             onPress={() =>
               router.push({
                 pathname: '/(seller)/add-account',
@@ -295,7 +300,8 @@ export default function AppDetailScreen() {
               <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
             )}
           </TouchableOpacity>
-        )}
+          );
+        }}
         ListEmptyComponent={
           <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada durasi'}</Text>
         }
@@ -497,8 +503,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     elevation: 1,
   },
-  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
-  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

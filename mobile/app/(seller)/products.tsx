@@ -241,9 +241,13 @@ export default function ProductsScreen() {
           const stockSold = item.stockSold ?? 0;
           const expiredCount = item.expiredCount ?? 0;
           const pendingWarrantyCount = item.pendingWarrantyCount ?? 0;
+          const cardBorderStyle = {
+            ...(expiredCount > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
+            ...(pendingWarrantyCount > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+          };
           return (
             <TouchableOpacity
-              style={[styles.card, !item.active && styles.cardInactive, expiredCount > 0 ? styles.cardExpired : pendingWarrantyCount > 0 && styles.cardWarrantyPending]}
+              style={[styles.card, !item.active && styles.cardInactive, cardBorderStyle]}
               onPress={() =>
                 router.push({
                   pathname: '/(seller)/app-detail',
@@ -622,8 +626,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardInactive: { opacity: 0.5 },
-  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
-  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },

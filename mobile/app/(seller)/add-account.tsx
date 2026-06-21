@@ -236,7 +236,10 @@ export default function AddAccountScreen() {
           } : {};
           return (
           <CardWrapper
-            style={[styles.card, (item.expiredCount ?? 0) > 0 ? styles.cardExpired : (item.pendingWarrantyCount ?? 0) > 0 && styles.cardWarrantyPending]}
+            style={[styles.card, {
+              ...((item.expiredCount ?? 0) > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
+              ...((item.pendingWarrantyCount ?? 0) > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+            }]}
             {...cardProps}
           >
             <View style={styles.cardRow}>
@@ -358,7 +361,10 @@ export default function AddAccountScreen() {
               const cardBg = isReminderOverdue ? '#fef2f2' : '#fff';
 
               return (
-                <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: cardBorderColor, backgroundColor: cardBg }]}>
+                <View style={[styles.card, {
+                  borderLeftWidth: 3, borderLeftColor: cardBorderColor, backgroundColor: cardBg,
+                  ...(order.warrantyStatus === 'SUBMITTED' ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+                }]}>
                   <View style={styles.cardRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.cardEmail}>👤 {buyerLabel}</Text>
@@ -572,8 +578,6 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#2563eb', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
-  cardExpired: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
-  cardWarrantyPending: { borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
   buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
   buyerLocked: { color: '#f59e0b', fontSize: 12, marginTop: 4 },

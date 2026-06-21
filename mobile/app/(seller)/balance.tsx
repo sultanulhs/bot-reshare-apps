@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ScrollView, TouchableOpacity } from 'react-native';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ScrollView, TouchableOpacity, Image, Modal, TextInput, Alert } from 'react-native';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import api from '../../src/lib/api';
 
@@ -33,6 +33,38 @@ export default function BalanceScreen() {
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const monthScrollRef = useRef<ScrollView>(null);
+  const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoHistoryOrderId, setPhotoHistoryOrderId] = useState<string | null>(null);
+  const [photoHistory, setPhotoHistory] = useState<any[]>([]);
+
+  const verifyWarranty = useMutation({
+    mutationFn: ({ orderId, approved, reason }: { orderId: string; approved: boolean; reason?: string }) =>
+      api.post(`/seller/orders/${orderId}/warranty-verify`, { approved, reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sales'] });
+      setRejectOrderId(null);
+      setRejectReason('');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const viewWarrantyPhoto = async (photoId: string) => {
+    try {
+      const res = await api.get(`/seller/warranty-photos/${photoId}/image`, { responseType: 'arraybuffer' });
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(res.data)));
+      setPhotoUri(`data:${res.headers['content-type'] || 'image/jpeg'};base64,${base64}`);
+    } catch { Alert.alert('Error', 'Gagal memuat foto'); }
+  };
+
+  const openPhotoHistory = async (orderId: string) => {
+    setPhotoHistoryOrderId(orderId);
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/warranty-photos`);
+      setPhotoHistory(res.data);
+    } catch { Alert.alert('Error', 'Gagal memuat riwayat'); }
+  };
 
   useEffect(() => {
     // Scroll so current month is visible near the right edge (before year picker)
@@ -142,11 +174,103 @@ export default function BalanceScreen() {
                   {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu' : '\u{274C} Garansi Hangus'}
                 </Text>
               )}
+              {item.warrantyStatus === 'SUBMITTED' && (
+                <>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#16a34a', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                      onPress={() => verifyWarranty.mutate({ orderId: item.orderId, approved: true })}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Setujui</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#ef4444', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                      onPress={() => setRejectOrderId(item.orderId)}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{274C}'} Tolak</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity onPress={() => openPhotoHistory(item.orderId)} style={{ marginTop: 4 }}>
+                    <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Riwayat Foto</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {item.warrantyStatus && item.warrantyStatus !== 'SUBMITTED' && item.warrantyStatus !== 'PENDING' && (
+                <TouchableOpacity onPress={() => openPhotoHistory(item.orderId)} style={{ marginTop: 2 }}>
+                  <Text style={{ color: '#2563eb', fontSize: 11 }}>{'\u{1F4F7}'} Riwayat Foto</Text>
+                </TouchableOpacity>
+              )}
             </View>
           );
         }}
         ListEmptyComponent={<Text style={styles.empty}>Belum ada transaksi di {MONTHS[selectedMonth]} {selectedYear}</Text>}
       />
+
+      {/* Reject Reason Modal */}
+      <Modal visible={!!rejectOrderId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Tolak Garansi</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12 }}
+              placeholder="Alasan penolakan..."
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: '#ef4444', borderRadius: 8, padding: 12, alignItems: 'center' }}
+              onPress={() => rejectOrderId && verifyWarranty.mutate({ orderId: rejectOrderId, approved: false, reason: rejectReason })}>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Tolak Garansi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setRejectOrderId(null); setRejectReason(''); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 12 }}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Photo History Modal */}
+      <Modal visible={!!photoHistoryOrderId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Riwayat Foto Garansi</Text>
+            <FlatList
+              data={photoHistory}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item: photo }) => (
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                  onPress={() => viewWarrantyPhoto(photo.id)}>
+                  <View style={[{ width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+                    { backgroundColor: photo.status === 'SUBMITTED' ? '#3b82f6' : photo.status === 'APPROVED' ? '#16a34a' : '#ef4444' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: photo.status === 'APPROVED' ? '#16a34a' : photo.status === 'REJECTED' ? '#ef4444' : '#3b82f6' }}>
+                      {photo.status === 'SUBMITTED' ? 'Menunggu' : photo.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                    </Text>
+                    {photo.status === 'REJECTED' && photo.reason && (
+                      <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Alasan: {photo.reason}</Text>
+                    )}
+                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      {new Date(photo.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                    </Text>
+                  </View>
+                  <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Lihat</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity onPress={() => { setPhotoHistoryOrderId(null); setPhotoHistory([]); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 16 }}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Photo Viewer Modal */}
+      <Modal visible={!!photoUri} animationType="fade" transparent>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPhotoUri(null)}>
+          {photoUri && <Image source={{ uri: photoUri }} style={{ width: '90%', height: '70%', resizeMode: 'contain' }} />}
+          <Text style={{ color: '#fff', marginTop: 16 }}>Ketuk untuk tutup</Text>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
