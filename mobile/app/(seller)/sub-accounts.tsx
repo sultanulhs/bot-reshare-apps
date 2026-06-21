@@ -13,6 +13,10 @@ interface SubAccount {
   pin: string;
   status: string;
   isExpired?: boolean;
+  buyerTgUserId?: string | null;
+  buyerInfo?: string | null;
+  orderStatus?: string | null;
+  accessExpiresAt?: string | null;
   createdAt: string;
 }
 
@@ -146,8 +150,15 @@ export default function SubAccountsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName}>{item.name}</Text>
                 <Text style={styles.cardPin}>PIN: {item.pin}</Text>
-                {item.isExpired && (
-                  <Text style={styles.expiredText}>Kadaluarsa</Text>
+                {item.buyerTgUserId && item.status === 'SOLD' && (
+                  <Text style={item.isExpired ? styles.buyerExpired : styles.buyerActive}>
+                    {item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {item.buyerInfo || `@${item.buyerTgUserId}`}
+                  </Text>
+                )}
+                {item.accessExpiresAt && item.status === 'SOLD' && (
+                  <Text style={styles.expiryDate}>
+                    Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleDateString('id-ID')}
+                  </Text>
                 )}
               </View>
               <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
@@ -223,8 +234,10 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#10b981', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 16 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
-  cardExpired: { backgroundColor: '#fef2f2' },
-  expiredText: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  cardExpired: { backgroundColor: '#fef2f2', borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
+  buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  expiryDate: { color: '#999', fontSize: 11, marginTop: 2 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardName: { fontSize: 15, fontWeight: '600', color: '#111' },
   cardPin: { fontSize: 13, color: '#666', marginTop: 2 },

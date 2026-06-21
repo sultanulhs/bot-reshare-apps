@@ -115,30 +115,40 @@ export class StockService {
   async listSubAccounts(accountId: string) {
     const subAccounts = await this.prisma.subAccount.findMany({
       where: { accountId, deletedAt: null },
+      include: {
+        order: {
+          select: {
+            buyerTgUserId: true,
+            buyerInfo: true,
+            status: true,
+            accessExpiresAt: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     const now = new Date();
-    const subAccountsWithExpired = await Promise.all(
-      subAccounts.map(async (s) => {
-        const expiredOrder = await this.prisma.order.findFirst({
-          where: {
-            subAccountId: s.id,
-            status: 'FULFILLED',
-            accessExpiresAt: { lte: now },
-          },
-        });
-        return {
-          id: s.id,
-          name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
-          pin: this.crypto.decrypt(s.encPin, s.pinIv, s.pinTag),
-          status: s.status,
-          isExpired: !!expiredOrder,
-          createdAt: s.createdAt,
-        };
-      }),
-    );
-    return subAccountsWithExpired;
+    return subAccounts.map((s) => {
+      const isExpired = !!(
+        s.order &&
+        s.order.status === 'FULFILLED' &&
+        s.order.accessExpiresAt &&
+        s.order.accessExpiresAt <= now
+      );
+      return {
+        id: s.id,
+        name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
+        pin: this.crypto.decrypt(s.encPin, s.pinIv, s.pinTag),
+        status: s.status,
+        isExpired,
+        buyerTgUserId: s.order?.buyerTgUserId?.toString() || null,
+        buyerInfo: s.order?.buyerInfo || null,
+        orderStatus: s.order?.status || null,
+        accessExpiresAt: s.order?.accessExpiresAt || null,
+        createdAt: s.createdAt,
+      };
+    });
   }
 
   async updateAccount(sellerId: string, id: string, dto: UpdateAccountDto) {
@@ -165,21 +175,45 @@ export class StockService {
 
     const updated = await this.prisma.account.update({ where: { id }, data });
 
-    // Notify buyer if account has a fulfilled order
+    // Notify active (non-expired) buyer if account has a fulfilled order
     try {
-      const order = await this.prisma.order.findFirst({
-        where: { accountId: id, status: 'FULFILLED' },
+      const activeOrder = await this.prisma.order.findFirst({
+        where: {
+          accountId: id,
+          status: 'FULFILLED',
+          OR: [
+            { accessExpiresAt: null },
+            { accessExpiresAt: { gt: new Date() } },
+          ],
+        },
       });
-      if (order) {
+      if (activeOrder) {
         const newEmail = dto.email || this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
         const newPassword = dto.password || this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
         await this.telegramService.bot.api.sendMessage(
-          order.buyerTgUserId.toString(),
+          activeOrder.buyerTgUserId.toString(),
           `⚠️ Info: Kredensial akun yang kamu beli telah diperbarui.\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword}`,
         );
       }
     } catch {
       // Silently ignore notification failures
+    }
+
+    // Reset stock for expired orders after password change
+    const now = new Date();
+    const expiredOrders = await this.prisma.order.findMany({
+      where: { accountId: id, status: 'FULFILLED', accessExpiresAt: { lte: now } },
+    });
+    if (expiredOrders.length > 0) {
+      await this.prisma.account.update({ where: { id }, data: { status: 'AVAILABLE' } });
+      for (const order of expiredOrders) {
+        if (order.subAccountId) {
+          await this.prisma.subAccount.update({
+            where: { id: order.subAccountId },
+            data: { status: 'AVAILABLE' },
+          });
+        }
+      }
     }
 
     return updated;
@@ -230,7 +264,17 @@ export class StockService {
       data.pinTag = enc.authTag;
     }
 
-    return this.prisma.subAccount.update({ where: { id }, data });
+    const updated = await this.prisma.subAccount.update({ where: { id }, data });
+
+    // Reset stock if sub-account's order is expired and credentials were changed
+    const expiredOrder = await this.prisma.order.findFirst({
+      where: { subAccountId: id, status: 'FULFILLED', accessExpiresAt: { lte: new Date() } },
+    });
+    if (expiredOrder) {
+      await this.prisma.subAccount.update({ where: { id }, data: { status: 'AVAILABLE' } });
+    }
+
+    return updated;
   }
 
   async softDeleteSubAccount(sellerId: string, id: string) {
