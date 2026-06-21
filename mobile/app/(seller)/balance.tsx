@@ -32,12 +32,6 @@ export default function BalanceScreen() {
     setRefreshing(false);
   }, [queryClient]);
 
-  const availableYears = useMemo(() => {
-    if (!sales || sales.length === 0) return [now.getFullYear()];
-    const years = new Set<number>(sales.map((s: any) => new Date(s.createdAt).getFullYear()));
-    return Array.from(years).sort((a, b) => b - a);
-  }, [sales]);
-
   const filteredSales = useMemo(() => {
     if (!sales) return [];
     return sales.filter((s: any) => {
@@ -54,24 +48,26 @@ export default function BalanceScreen() {
         <Text style={styles.note}>Pencairan manual (hubungi admin)</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
-
-      {/* Year filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {availableYears.map((y) => (
-          <TouchableOpacity key={y} onPress={() => setSelectedYear(y)}
-            style={[styles.filterChip, selectedYear === y && styles.filterChipActive]}>
-            <Text style={[styles.filterChipText, selectedYear === y && styles.filterChipTextActive]}>{y}</Text>
+      {/* Header: title + year picker inline */}
+      <View style={styles.headerRow}>
+        <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
+        <View style={styles.yearPicker}>
+          <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
+            <Text style={styles.yearArrowText}>{'<'}</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <Text style={styles.yearText}>{selectedYear}</Text>
+          <TouchableOpacity onPress={() => setSelectedYear(y => Math.min(y + 1, new Date().getFullYear()))} style={styles.yearArrow}>
+            <Text style={styles.yearArrowText}>{'>'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Month filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
         {MONTHS.map((m, i) => (
           <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
-            style={[styles.filterChip, selectedMonth === i && styles.filterChipActive]}>
-            <Text style={[styles.filterChipText, selectedMonth === i && styles.filterChipTextActive]}>{m}</Text>
+            style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
+            <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -124,17 +120,22 @@ const styles = StyleSheet.create({
   label: { color: '#ddd', fontSize: 14 },
   amount: { color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 4 },
   note: { color: '#bbb', fontSize: 12, marginTop: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  filterRow: { flexDirection: 'row', marginBottom: 8, flexGrow: 0 },
-  filterChip: { backgroundColor: '#e5e7eb', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginRight: 6 },
-  filterChipActive: { backgroundColor: '#2563eb' },
-  filterChipText: { fontSize: 12, color: '#555', fontWeight: '500' },
-  filterChipTextActive: { color: '#fff', fontWeight: '700' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  yearPicker: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, elevation: 1 },
+  yearArrow: { paddingHorizontal: 10, paddingVertical: 4 },
+  yearArrowText: { fontSize: 16, fontWeight: '700', color: '#2563eb' },
+  yearText: { fontSize: 15, fontWeight: '700', color: '#1e293b', marginHorizontal: 4 },
+  filterRow: { flexDirection: 'row', marginBottom: 10, flexGrow: 0 },
+  monthChip: { backgroundColor: '#f3f4f6', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8, marginRight: 6 },
+  monthChipActive: { backgroundColor: '#2563eb' },
+  monthChipText: { fontSize: 14, color: '#374151', fontWeight: '600' },
+  monthChipTextActive: { color: '#fff', fontWeight: '700' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   cardTitle: { fontSize: 14, fontWeight: '600', flex: 1, marginRight: 8 },
-  badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  badge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   cardBuyer: { fontSize: 12, color: '#555', marginBottom: 4 },
   priceTotal: { fontSize: 13, fontWeight: '600', color: '#111', marginBottom: 4 },
   cardDate: { fontSize: 11, color: '#999', marginTop: 1 },
