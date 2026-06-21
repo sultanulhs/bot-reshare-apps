@@ -454,7 +454,7 @@ export function createBuyerComposer(
     await ctx.answerCallbackQuery();
     const tgUserId = BigInt(ctx.from.id);
     const orders = await prisma.order.findMany({
-      where: { buyerTgUserId: tgUserId, warrantyStatus: 'PENDING' },
+      where: { buyerTgUserId: tgUserId, warrantyStatus: { in: ['PENDING', 'SUBMITTED'] } },
       include: { duration: { include: { app: { include: { template: true } } } } },
     });
     if (orders.length === 0) {
@@ -465,11 +465,21 @@ export function createBuyerComposer(
     for (const o of orders) {
       const name = o.duration?.app?.template?.name ?? 'Pesanan';
       const label = o.duration?.label ?? '';
-      keyboard.text(`\u{1F4F8} ${name}${label ? ` (${label})` : ''}`, `warranty_${o.id}`).row();
+      if (o.warrantyStatus === 'SUBMITTED') {
+        keyboard.text(`\u{23F3} ${name}${label ? ` (${label})` : ''} — Menunggu Verifikasi`, `warranty_info_${o.id}`).row();
+      } else {
+        keyboard.text(`\u{1F4F8} ${name}${label ? ` (${label})` : ''}`, `warranty_${o.id}`).row();
+      }
     }
     await ctx.reply('\u{1F6E1}\u{FE0F} *Aktivasi Garansi*\n\nPilih pesanan untuk mengirim screenshot login:', {
       reply_markup: keyboard, parse_mode: 'Markdown',
     });
+  });
+
+  // Warranty — info for submitted orders
+  composer.callbackQuery(/^warranty_info_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await ctx.reply('⏳ Foto garansi kamu sudah dikirim dan sedang menunggu verifikasi dari penjual.');
   });
 
   // Warranty — select order and prompt for photo
