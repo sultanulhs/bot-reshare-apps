@@ -236,6 +236,8 @@ model SubAccount {
 model Order {
   id                 String        @id @default(cuid())
   buyerTgUserId      BigInt
+  buyerName          String?
+  buyerUsername       String?
   durationId         String?
   duration           Duration?     @relation(fields: [durationId], references: [id])
   accountId          String?       @unique

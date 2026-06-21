@@ -212,8 +212,13 @@ export function createBuyerComposer(
     }
 
     try {
+      const buyerName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || undefined;
+      const buyerUsername = ctx.from.username || undefined;
+
       const order = await orderService.createOrder({
         buyerTgUserId: tgUserId,
+        buyerName,
+        buyerUsername,
         durationId,
         sellerId: affiliation.sellerId,
       });

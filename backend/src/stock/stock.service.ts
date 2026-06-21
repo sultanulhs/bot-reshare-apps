@@ -119,6 +119,8 @@ export class StockService {
         order: {
           select: {
             buyerTgUserId: true,
+            buyerName: true,
+            buyerUsername: true,
             buyerInfo: true,
             status: true,
             accessExpiresAt: true,
@@ -143,6 +145,8 @@ export class StockService {
         status: s.status,
         isExpired,
         buyerTgUserId: s.order?.buyerTgUserId?.toString() || null,
+        buyerName: s.order?.buyerName || null,
+        buyerUsername: s.order?.buyerUsername || null,
         buyerInfo: s.order?.buyerInfo || null,
         orderStatus: s.order?.status || null,
         accessExpiresAt: s.order?.accessExpiresAt || null,

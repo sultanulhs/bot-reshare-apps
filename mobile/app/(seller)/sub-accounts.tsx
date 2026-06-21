@@ -14,6 +14,8 @@ interface SubAccount {
   status: string;
   isExpired?: boolean;
   buyerTgUserId?: string | null;
+  buyerName?: string | null;
+  buyerUsername?: string | null;
   buyerInfo?: string | null;
   orderStatus?: string | null;
   accessExpiresAt?: string | null;
@@ -152,7 +154,11 @@ export default function SubAccountsScreen() {
                 <Text style={styles.cardPin}>PIN: {item.pin}</Text>
                 {item.buyerTgUserId && item.status === 'SOLD' && (
                   <Text style={item.isExpired ? styles.buyerExpired : styles.buyerActive}>
-                    {item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {item.buyerInfo || `@${item.buyerTgUserId}`}
+                    {item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {
+                      item.buyerName
+                        ? `${item.buyerName}${item.buyerUsername ? ` (@${item.buyerUsername})` : ''}`
+                        : item.buyerInfo || (item.buyerUsername ? `@${item.buyerUsername}` : `@${item.buyerTgUserId}`)
+                    }
                   </Text>
                 )}
                 {item.accessExpiresAt && item.status === 'SOLD' && (

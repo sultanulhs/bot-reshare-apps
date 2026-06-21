@@ -17,6 +17,8 @@ import { TelegramService } from '../telegram/telegram.service';
 
 interface CreateOrderParams {
   buyerTgUserId: bigint;
+  buyerName?: string;
+  buyerUsername?: string;
   durationId: string;
   sellerId: string;
   buyerInfo?: string;
@@ -85,6 +87,8 @@ export class OrderService {
       const order = await tx.order.create({
         data: {
           buyerTgUserId: params.buyerTgUserId,
+          buyerName: params.buyerName ?? null,
+          buyerUsername: params.buyerUsername ?? null,
           durationId: duration.id,
           accountId: accountId ?? null,
           subAccountId: subAccountId ?? null,
