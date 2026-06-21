@@ -160,6 +160,15 @@ export class OrderService {
         data: { status: 'EXPIRED', subAccountId: null, accountId: null },
       });
     });
+
+    try {
+      await this.telegramService.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        `❌ Pesanan kamu telah kedaluwarsa karena belum dibayar.\nSilakan buat pesanan baru jika masih berminat.`,
+      );
+    } catch {
+      // Silently ignore notification failures
+    }
   }
 
   async getExpiredAccounts(sellerId: string) {
