@@ -285,20 +285,36 @@ export default function AddAccountScreen() {
                 {(order.status === 'PENDING' || order.status === 'EXPIRED') && order.expiresAt && (
                   <Text style={styles.cardMeta}>{order.status === 'PENDING' ? '⏰ Batas bayar' : '❌ Expired'}: {fmtDate(order.expiresAt)}</Text>
                 )}
-                {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (
-                  <>
-                    <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
-                      <Text style={styles.sendMsgBtnText}>📨 Kirim Pesan</Text>
-                    </TouchableOpacity>
-                    <View style={styles.toggleRow}>
-                      <Text style={styles.toggleLabel}>🔔 Reminder Bulanan</Text>
-                      <Switch
-                        value={order.reminderEnabled}
-                        onValueChange={(val) => toggleReminder.mutate({ orderId: order.id, enabled: val })}
-                      />
-                    </View>
-                  </>
-                )}
+                {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (() => {
+                  const nextReminder = order.fulfilledAt ? (() => {
+                    const d = new Date(order.fulfilledAt);
+                    d.setMonth(d.getMonth() + 1);
+                    d.setDate(1); d.setHours(9, 0, 0, 0);
+                    while (d <= new Date()) { d.setMonth(d.getMonth() + 1); }
+                    return d;
+                  })() : null;
+                  return (
+                    <>
+                      <View style={styles.actionInlineRow}>
+                        <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
+                          <Text style={styles.sendMsgBtnText}>📨 Pesan</Text>
+                        </TouchableOpacity>
+                        <View style={styles.reminderInline}>
+                          <Text style={styles.reminderLabel}>🔔</Text>
+                          <Switch
+                            value={order.reminderEnabled}
+                            onValueChange={(val) => toggleReminder.mutate({ orderId: order.id, enabled: val })}
+                          />
+                        </View>
+                      </View>
+                      {order.reminderEnabled && nextReminder && (
+                        <Text style={styles.reminderDate}>
+                          🔔 Reminder: {nextReminder.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                        </Text>
+                      )}
+                    </>
+                  );
+                })()}
               </View>
             );
           })}
@@ -408,8 +424,12 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
   deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
-  sendMsgBtn: { backgroundColor: '#2563eb', borderRadius: 6, padding: 8, alignItems: 'center', marginTop: 8 },
+  actionInlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 8 },
+  sendMsgBtn: { backgroundColor: '#2563eb', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, flex: 1, alignItems: 'center' },
   sendMsgBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  reminderInline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reminderLabel: { fontSize: 16 },
+  reminderDate: { fontSize: 11, color: '#2563eb', marginTop: 4 },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
