@@ -85,7 +85,16 @@ export class OrderService {
           accountId = acc.id;
         }
       }
-      // MANUAL: no account needed
+
+      // MANUAL: check stock if manualStock is set
+      if (duration.productType === 'MANUAL' && duration.manualStock !== null) {
+        const activeOrders = await tx.order.count({
+          where: { durationId: duration.id, status: { in: ['PENDING', 'FULFILLED', 'WAITING_SELLER'] } },
+        });
+        if (activeOrders >= duration.manualStock) {
+          throw new BadRequestException('No stock available');
+        }
+      }
 
       const markup = await this.markupService.computeMarkup();
       const totalAmount = duration.basePrice + markup;

@@ -10,6 +10,7 @@ import {
   Modal,
   BackHandler,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { useState, useMemo, useCallback } from 'react';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -24,6 +25,7 @@ interface Duration {
   basePrice: number;
   productType: ProductType;
   buyerInfoLabel?: string;
+  manualStock?: number | null;
   accountCount?: number;
   stockAvailable?: number;
   stockLocked?: number;
@@ -72,6 +74,8 @@ export default function AppDetailScreen() {
     basePrice: '',
     productType: 'AKUN_READY' as ProductType,
     buyerInfoLabel: '',
+    manualStockUnlimited: true,
+    manualStock: '',
   });
   const [editingDuration, setEditingDuration] = useState<Duration | null>(null);
   const [editForm, setEditForm] = useState({
@@ -80,6 +84,8 @@ export default function AppDetailScreen() {
     basePrice: '',
     productType: 'AKUN_READY' as ProductType,
     buyerInfoLabel: '',
+    manualStockUnlimited: true,
+    manualStock: '',
   });
 
   const { data: appDetail, isLoading, refetch } = useQuery<AppDetail>({
@@ -119,7 +125,7 @@ export default function AppDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-app', appId] });
       setShowAdd(false);
-      setForm({ label: '', days: '', basePrice: '', productType: 'AKUN_READY', buyerInfoLabel: '' });
+      setForm({ label: '', days: '', basePrice: '', productType: 'AKUN_READY', buyerInfoLabel: '', manualStockUnlimited: true, manualStock: '' });
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -163,6 +169,9 @@ export default function AppDetailScreen() {
       ...(form.productType === 'MANUAL' && form.buyerInfoLabel.trim()
         ? { buyerInfoLabel: form.buyerInfoLabel.trim() }
         : {}),
+      ...(form.productType === 'MANUAL'
+        ? { manualStock: form.manualStockUnlimited ? null : (parseInt(form.manualStock) || 0) }
+        : {}),
     });
   };
 
@@ -174,6 +183,8 @@ export default function AppDetailScreen() {
       basePrice: String(duration.basePrice),
       productType: duration.productType,
       buyerInfoLabel: duration.buyerInfoLabel || '',
+      manualStockUnlimited: duration.manualStock === null || duration.manualStock === undefined,
+      manualStock: duration.manualStock != null ? String(duration.manualStock) : '',
     });
   };
 
@@ -193,6 +204,9 @@ export default function AppDetailScreen() {
         ...(editForm.productType === 'MANUAL' && editForm.buyerInfoLabel.trim()
           ? { buyerInfoLabel: editForm.buyerInfoLabel.trim() }
           : { buyerInfoLabel: undefined }),
+        ...(editForm.productType === 'MANUAL'
+          ? { manualStock: editForm.manualStockUnlimited ? null : (parseInt(editForm.manualStock) || 0) }
+          : { manualStock: null }),
       },
     });
   };
@@ -263,9 +277,15 @@ export default function AppDetailScreen() {
               </View>
             </View>
             <Text style={styles.cardPrice}>{formatRupiah(item.basePrice)}</Text>
-            <Text style={styles.cardMeta}>{item.accountCount ?? 0} akun</Text>
+            {item.productType === 'MANUAL' ? (
+              <Text style={styles.cardMeta}>
+                Stok: {item.manualStock === null || item.manualStock === undefined ? 'Unlimited' : item.manualStock}
+              </Text>
+            ) : (
+              <Text style={styles.cardMeta}>{item.accountCount ?? 0} akun</Text>
+            )}
             <Text style={styles.cardStock}>
-              Tersedia: {item.stockAvailable ?? 0} | Terkunci: {item.stockLocked ?? 0} | Terjual: {item.stockSold ?? 0}
+              Tersedia: {item.stockAvailable === -1 ? '∞' : (item.stockAvailable ?? 0)} | Terkunci: {item.stockLocked ?? 0} | Terjual: {item.stockSold ?? 0}
             </Text>
             {(item.expiredCount ?? 0) > 0 && (
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
@@ -324,6 +344,27 @@ export default function AppDetailScreen() {
                 value={editForm.buyerInfoLabel}
                 onChangeText={(v) => setEditForm({ ...editForm, buyerInfoLabel: v })}
               />
+            )}
+
+            {editForm.productType === 'MANUAL' && (
+              <>
+                <View style={styles.switchRow}>
+                  <Text style={styles.label}>Stok Unlimited</Text>
+                  <Switch
+                    value={editForm.manualStockUnlimited}
+                    onValueChange={(v) => setEditForm({ ...editForm, manualStockUnlimited: v, manualStock: v ? '' : editForm.manualStock })}
+                  />
+                </View>
+                {!editForm.manualStockUnlimited && (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Jumlah stok"
+                    value={editForm.manualStock}
+                    onChangeText={(v) => setEditForm({ ...editForm, manualStock: v })}
+                    keyboardType="numeric"
+                  />
+                )}
+              </>
             )}
 
             <TouchableOpacity
@@ -391,6 +432,27 @@ export default function AppDetailScreen() {
               />
             )}
 
+            {form.productType === 'MANUAL' && (
+              <>
+                <View style={styles.switchRow}>
+                  <Text style={styles.label}>Stok Unlimited</Text>
+                  <Switch
+                    value={form.manualStockUnlimited}
+                    onValueChange={(v) => setForm({ ...form, manualStockUnlimited: v, manualStock: v ? '' : form.manualStock })}
+                  />
+                </View>
+                {!form.manualStockUnlimited && (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Jumlah stok"
+                    value={form.manualStock}
+                    onChangeText={(v) => setForm({ ...form, manualStock: v })}
+                    keyboardType="numeric"
+                  />
+                )}
+              </>
+            )}
+
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit}
@@ -454,6 +516,7 @@ const styles = StyleSheet.create({
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500' },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   typeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f0f0f0' },
   typeChipSelected: { backgroundColor: '#2563eb' },

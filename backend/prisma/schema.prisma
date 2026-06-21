@@ -193,6 +193,7 @@ model Duration {
   basePrice      Int
   productType    ProductType @default(AKUN_READY)
   buyerInfoLabel String?
+  manualStock    Int?
   active         Boolean     @default(true)
   accounts       Account[]
   orders         Order[]

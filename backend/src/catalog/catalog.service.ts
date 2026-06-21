@@ -93,18 +93,32 @@ export class CatalogService {
       apps.map(async (app) => {
         const appDurationFilter = { deletedAt: null, duration: { appId: app.id, deletedAt: null } };
         const noSubFilter = { ...appDurationFilter, subAccounts: { none: { deletedAt: null } } };
-        const stockAvailable =
+        let stockAvailable =
           (await this.prisma.subAccount.count({ where: { status: 'AVAILABLE', deletedAt: null, account: appDurationFilter } })) +
           (await this.prisma.account.count({ where: { status: 'AVAILABLE', ...noSubFilter } }));
-        const stockLocked =
+        let stockLocked =
           (await this.prisma.subAccount.count({ where: { status: 'LOCKED', deletedAt: null, account: appDurationFilter } })) +
           (await this.prisma.account.count({ where: { status: 'LOCKED', ...noSubFilter } }));
-        const stockSold =
+        let stockSold =
           (await this.prisma.subAccount.count({ where: { status: 'SOLD', deletedAt: null, account: appDurationFilter } })) +
           (await this.prisma.account.count({ where: { status: 'SOLD', ...noSubFilter } }));
         const accountCount = await this.prisma.account.count({
           where: { deletedAt: null, duration: { appId: app.id, deletedAt: null } },
         });
+
+        // Add MANUAL duration stock
+        for (const d of app.durations) {
+          if (d.productType === 'MANUAL') {
+            if (d.manualStock === null) {
+              stockAvailable += 1; // unlimited = at least 1 available
+            } else {
+              const activeOrders = await this.prisma.order.count({
+                where: { durationId: d.id, status: { in: ['PENDING', 'FULFILLED', 'WAITING_SELLER'] } },
+              });
+              stockAvailable += Math.max(0, d.manualStock - activeOrders);
+            }
+          }
+        }
         const expiredCount = await this.prisma.order.count({
           where: {
             status: 'FULFILLED',
@@ -256,6 +270,7 @@ export class CatalogService {
         basePrice: dto.basePrice,
         productType: dto.productType as any,
         buyerInfoLabel: dto.buyerInfoLabel,
+        manualStock: dto.manualStock ?? null,
       },
     });
   }
@@ -276,6 +291,7 @@ export class CatalogService {
         ...(dto.basePrice !== undefined ? { basePrice: dto.basePrice } : {}),
         ...(dto.productType !== undefined ? { productType: dto.productType as any } : {}),
         ...(dto.buyerInfoLabel !== undefined ? { buyerInfoLabel: dto.buyerInfoLabel } : {}),
+        ...(dto.manualStock !== undefined ? { manualStock: dto.manualStock } : {}),
       },
     });
   }
@@ -318,20 +334,42 @@ export class CatalogService {
 
     const durationsWithStock = await Promise.all(
       app.durations.map(async (d) => {
-        const accountCount = await this.prisma.account.count({
-          where: { durationId: d.id, deletedAt: null },
-        });
-        const durFilter = { durationId: d.id, deletedAt: null };
-        const noSubDurFilter = { ...durFilter, subAccounts: { none: { deletedAt: null } } };
-        const stockAvailable =
-          (await this.prisma.subAccount.count({ where: { status: 'AVAILABLE', deletedAt: null, account: durFilter } })) +
-          (await this.prisma.account.count({ where: { status: 'AVAILABLE', ...noSubDurFilter } }));
-        const stockLocked =
-          (await this.prisma.subAccount.count({ where: { status: 'LOCKED', deletedAt: null, account: durFilter } })) +
-          (await this.prisma.account.count({ where: { status: 'LOCKED', ...noSubDurFilter } }));
-        const stockSold =
-          (await this.prisma.subAccount.count({ where: { status: 'SOLD', deletedAt: null, account: durFilter } })) +
-          (await this.prisma.account.count({ where: { status: 'SOLD', ...noSubDurFilter } }));
+        let accountCount = 0;
+        let stockAvailable = 0;
+        let stockLocked = 0;
+        let stockSold = 0;
+
+        if (d.productType === 'MANUAL') {
+          if (d.manualStock === null) {
+            stockAvailable = -1; // unlimited
+          } else {
+            const pendingOrders = await this.prisma.order.count({
+              where: { durationId: d.id, status: 'PENDING' },
+            });
+            const fulfilledOrders = await this.prisma.order.count({
+              where: { durationId: d.id, status: { in: ['FULFILLED', 'WAITING_SELLER'] } },
+            });
+            stockLocked = pendingOrders;
+            stockSold = fulfilledOrders;
+            stockAvailable = Math.max(0, d.manualStock - pendingOrders - fulfilledOrders);
+          }
+        } else {
+          accountCount = await this.prisma.account.count({
+            where: { durationId: d.id, deletedAt: null },
+          });
+          const durFilter = { durationId: d.id, deletedAt: null };
+          const noSubDurFilter = { ...durFilter, subAccounts: { none: { deletedAt: null } } };
+          stockAvailable =
+            (await this.prisma.subAccount.count({ where: { status: 'AVAILABLE', deletedAt: null, account: durFilter } })) +
+            (await this.prisma.account.count({ where: { status: 'AVAILABLE', ...noSubDurFilter } }));
+          stockLocked =
+            (await this.prisma.subAccount.count({ where: { status: 'LOCKED', deletedAt: null, account: durFilter } })) +
+            (await this.prisma.account.count({ where: { status: 'LOCKED', ...noSubDurFilter } }));
+          stockSold =
+            (await this.prisma.subAccount.count({ where: { status: 'SOLD', deletedAt: null, account: durFilter } })) +
+            (await this.prisma.account.count({ where: { status: 'SOLD', ...noSubDurFilter } }));
+        }
+
         const expiredCount = await this.prisma.order.count({
           where: {
             status: 'FULFILLED',
@@ -346,6 +384,7 @@ export class CatalogService {
           basePrice: d.basePrice,
           productType: d.productType,
           buyerInfoLabel: d.buyerInfoLabel,
+          manualStock: d.manualStock,
           accountCount,
           stockAvailable,
           stockLocked,

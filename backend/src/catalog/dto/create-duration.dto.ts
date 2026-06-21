@@ -19,4 +19,8 @@ export class CreateDurationDto {
   @IsOptional()
   @IsString()
   buyerInfoLabel?: string;
+
+  @IsOptional()
+  @IsInt()
+  manualStock?: number | null;
 }

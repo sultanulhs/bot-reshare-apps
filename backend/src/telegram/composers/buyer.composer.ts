@@ -88,7 +88,14 @@ export function createBuyerComposer(
     const catStock = new Map<string, number>();
     for (const app of allApps) {
       const catId = app.template.category.id;
-      catStock.set(catId, (catStock.get(catId) ?? 0) + (app.stockAvailable ?? 0));
+      const current = catStock.get(catId) ?? 0;
+      const appStock = app.stockAvailable ?? 0;
+      // If any app has unlimited (-1), mark category as unlimited
+      if (appStock === -1 || current === -1) {
+        catStock.set(catId, -1);
+      } else {
+        catStock.set(catId, current + appStock);
+      }
     }
 
     // Filter: only show categories that have at least one app
@@ -103,7 +110,7 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const cat of filtered) {
       const stock = catStock.get(cat.id) ?? 0;
-      const indicator = stock > 0 ? '✅' : '❌';
+      const indicator = stock === -1 || stock > 0 ? '✅' : '❌';
       keyboard
         .text(`${indicator} ${cat.icon ?? ''} ${cat.name}`.trim(), `cat_${cat.id}`)
         .row();
@@ -140,7 +147,7 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const app of apps) {
       const stock = (app as any).stockAvailable ?? 0;
-      const indicator = stock > 0 ? '✅' : '❌';
+      const indicator = stock === -1 || stock > 0 ? '✅' : '❌';
       keyboard.text(`${indicator} ${app.template.name}`, `app_${app.id}`).row();
     }
     keyboard.text('\u{2B05}️ Kembali', 'catalog').row();
@@ -166,7 +173,7 @@ export function createBuyerComposer(
     const keyboard = new InlineKeyboard();
     for (const dur of appWithStock.durations) {
       const stock = (dur as any).stockAvailable ?? 0;
-      const indicator = stock > 0 ? '✅' : '❌';
+      const indicator = stock === -1 || stock > 0 ? '✅' : '❌';
       keyboard
         .text(
           `${indicator} ${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}`,

@@ -6,4 +6,5 @@ export class UpdateDurationDto {
   @IsOptional() @IsInt() @Min(0) basePrice?: number;
   @IsOptional() @IsEnum(['AKUN_READY', 'MANUAL']) productType?: string;
   @IsOptional() @IsString() buyerInfoLabel?: string;
+  @IsOptional() manualStock?: number | null;
 }
