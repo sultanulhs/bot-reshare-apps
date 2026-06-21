@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Modal, BackHandler, RefreshControl, Switch,
+  Alert, Modal, BackHandler, RefreshControl, Switch, Clipboard,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -297,7 +297,14 @@ export default function AddAccountScreen() {
                   <View style={styles.cardRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.cardEmail}>👤 {buyerLabel}</Text>
-                      {order.buyerInfo && <Text style={styles.cardPass}>📋 {order.buyerInfo}</Text>}
+                      {order.buyerInfo && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.cardPass, { flex: 1 }]}>📋 {order.buyerInfo}</Text>
+                        <TouchableOpacity onPress={() => { Clipboard.setString(order.buyerInfo!); Alert.alert('Tersalin', 'Info pembeli telah disalin'); }}>
+                          <Text style={{ fontSize: 16 }}>📋</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                     </View>
                     <View style={[styles.badge, { backgroundColor: statusColors[order.status] || '#999' }]}>
                       <Text style={styles.badgeText}>{order.status}</Text>
@@ -314,10 +321,10 @@ export default function AddAccountScreen() {
                     <>
                       <View style={styles.actionInlineRow}>
                         <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
-                          <Text style={styles.sendMsgBtnText}>📨 Pesan</Text>
+                          <Text style={styles.sendMsgBtnText}>📨 Kirim Pesan</Text>
                         </TouchableOpacity>
                         <View style={styles.reminderInline}>
-                          <Text style={styles.reminderLabel}>🔔</Text>
+                          <Text style={styles.reminderLabel}>🔔 Reminder</Text>
                           <Switch
                             value={order.reminderEnabled}
                             onValueChange={(val) => toggleReminder.mutate({ orderId: order.id, enabled: val })}

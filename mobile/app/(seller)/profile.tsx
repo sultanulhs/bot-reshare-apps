@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, RefreshControl, Clipboard } from 'react-native';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
@@ -144,7 +144,12 @@ export default function ProfileScreen() {
             <>
               <Text style={styles.storeCode} selectable>{me.storeCode}</Text>
               {storeLink && (
-                <Text style={styles.link} selectable>{storeLink.url}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.link, { flex: 1 }]} selectable>{storeLink.url}</Text>
+                  <TouchableOpacity onPress={() => { Clipboard.setString(storeLink.url); Alert.alert('Tersalin', 'Link toko telah disalin'); }}>
+                    <Text style={{ fontSize: 18 }}>📋</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </>
           ) : (

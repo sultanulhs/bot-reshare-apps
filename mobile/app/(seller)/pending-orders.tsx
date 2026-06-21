@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   RefreshControl,
+  Clipboard,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import api from '../../src/lib/api';
@@ -133,7 +134,12 @@ export default function PendingOrdersScreen() {
               )}
               {pending.buyerInfo && (
                 <View style={styles.buyerInfoBox}>
-                  <Text style={styles.buyerInfoLabel}>Info Pembeli:</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.buyerInfoLabel}>Info Pembeli:</Text>
+                    <TouchableOpacity onPress={() => { Clipboard.setString(pending.buyerInfo!); Alert.alert('Tersalin', 'Info pembeli telah disalin'); }}>
+                      <Text style={{ fontSize: 14 }}>📋</Text>
+                    </TouchableOpacity>
+                  </View>
                   <Text style={styles.buyerInfoText}>{pending.buyerInfo}</Text>
                 </View>
               )}
