@@ -142,7 +142,7 @@ export class StockService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
 
     const now = new Date();

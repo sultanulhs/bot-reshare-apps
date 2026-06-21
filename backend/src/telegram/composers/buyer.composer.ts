@@ -79,16 +79,30 @@ export function createBuyerComposer(
     }
 
     const categories = await catalogService.getCategories(affiliation.sellerId);
+    const allApps = await catalogService.getApps(affiliation.sellerId);
 
-    if (categories.length === 0) {
+    // Build stock count per category
+    const catStock = new Map<string, number>();
+    for (const app of allApps) {
+      const catId = app.template.category.id;
+      catStock.set(catId, (catStock.get(catId) ?? 0) + (app.stockAvailable ?? 0));
+    }
+
+    // Filter: only show categories that have at least one app
+    const catsWithApps = new Set(allApps.map((a: any) => a.template.category.id));
+    const filtered = categories.filter((c: any) => catsWithApps.has(c.id));
+
+    if (filtered.length === 0) {
       await ctx.reply('\u{1F614} Tidak ada kategori tersedia saat ini.');
       return;
     }
 
     const keyboard = new InlineKeyboard();
-    for (const cat of categories) {
+    for (const cat of filtered) {
+      const stock = catStock.get(cat.id) ?? 0;
+      const stockLabel = stock > 0 ? ` (${stock} tersedia)` : ' (Habis)';
       keyboard
-        .text(`${cat.icon ?? ''} ${cat.name}`.trim(), `cat_${cat.id}`)
+        .text(`${cat.icon ?? ''} ${cat.name}${stockLabel}`.trim(), `cat_${cat.id}`)
         .row();
     }
 
@@ -122,7 +136,9 @@ export function createBuyerComposer(
 
     const keyboard = new InlineKeyboard();
     for (const app of apps) {
-      keyboard.text(app.template.name, `app_${app.id}`).row();
+      const stock = (app as any).stockAvailable ?? 0;
+      const indicator = stock > 0 ? ' ✅' : ' ❌ Habis';
+      keyboard.text(`${app.template.name}${indicator}`, `app_${app.id}`).row();
     }
     keyboard.text('\u{2B05}️ Kembali', 'catalog').row();
 
@@ -146,9 +162,11 @@ export function createBuyerComposer(
 
     const keyboard = new InlineKeyboard();
     for (const dur of appWithStock.durations) {
+      const stock = (dur as any).stockAvailable ?? 0;
+      const indicator = stock > 0 ? ' ✅' : ' ❌';
       keyboard
         .text(
-          `${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}`,
+          `${dur.label} - Rp${dur.basePrice.toLocaleString('id-ID')}${indicator}`,
           `buy_${dur.id}`,
         )
         .row();

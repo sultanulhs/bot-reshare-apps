@@ -83,6 +83,7 @@ export class CatalogService {
         },
         durations: {
           where: { active: true, deletedAt: null },
+          orderBy: { label: 'asc' },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -233,7 +234,7 @@ export class CatalogService {
   async getDurations(appId: string) {
     return this.prisma.duration.findMany({
       where: { appId, active: true, deletedAt: null },
-      orderBy: { days: 'asc' },
+      orderBy: { label: 'asc' },
     });
   }
 
@@ -304,6 +305,7 @@ export class CatalogService {
         },
         durations: {
           where: { active: true, deletedAt: null },
+          orderBy: { label: 'asc' },
         },
       },
     });
