@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { View, Text, FlatList, StyleSheet, RefreshControl, ScrollView, TouchableOpacity } from 'react-native';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import api from '../../src/lib/api';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -32,6 +32,14 @@ export default function BalanceScreen() {
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const monthScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    // Scroll so current month is visible near the right edge (before year picker)
+    const chipWidth = 56 + 8; // minWidth + marginRight approx
+    const scrollTo = Math.max(0, (selectedMonth - 2) * chipWidth);
+    setTimeout(() => monthScrollRef.current?.scrollTo({ x: scrollTo, animated: false }), 100);
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -73,6 +81,14 @@ export default function BalanceScreen() {
       </View>
 
       <View style={styles.dateFilterRow}>
+        <ScrollView ref={monthScrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          {MONTHS.map((m, i) => (
+            <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
+              style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
+              <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         <View style={styles.yearPicker}>
           <TouchableOpacity onPress={() => setSelectedYear(y => y - 1)} style={styles.yearArrow}>
             <Text style={styles.yearArrowText}>{'<'}</Text>
@@ -82,14 +98,6 @@ export default function BalanceScreen() {
             <Text style={styles.yearArrowText}>{'>'}</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          {MONTHS.map((m, i) => (
-            <TouchableOpacity key={i} onPress={() => setSelectedMonth(i)}
-              style={[styles.monthChip, selectedMonth === i && styles.monthChipActive]}>
-              <Text style={[styles.monthChipText, selectedMonth === i && styles.monthChipTextActive]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
 
       <FlatList
