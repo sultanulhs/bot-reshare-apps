@@ -1,0 +1,1 @@
+ALTER TABLE "Order" ADD COLUMN "reminderEnabled" BOOLEAN NOT NULL DEFAULT false;

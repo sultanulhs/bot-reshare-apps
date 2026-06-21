@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  OnModuleInit,
   forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -25,7 +26,7 @@ interface CreateOrderParams {
 }
 
 @Injectable()
-export class OrderService {
+export class OrderService implements OnModuleInit {
   private readonly logger = new Logger(OrderService.name);
 
   constructor(
@@ -35,10 +36,19 @@ export class OrderService {
     private readonly paymentService: PaymentService,
     private readonly config: ConfigService,
     @InjectQueue('order-expiry') private readonly expiryQueue: Queue,
+    @InjectQueue('manual-reminder') private readonly reminderQueue: Queue,
     private readonly cryptoService: CryptoService,
     @Inject(forwardRef(() => TelegramService))
     private readonly telegramService: TelegramService,
   ) {}
+
+  async onModuleInit() {
+    // Seed monthly reminder cron job
+    await this.reminderQueue.add('monthly-reminder', {}, {
+      repeat: { pattern: '0 9 1 * *' },
+      removeOnComplete: true,
+    });
+  }
 
   async createOrder(params: CreateOrderParams) {
     const duration = await this.prisma.duration.findFirst({
@@ -317,5 +327,40 @@ export class OrderService {
         `Failed to send credentials to buyer ${order.buyerTgUserId}: ${err.message}`,
       );
     }
+  }
+
+  async sendMessageToBuyer(sellerId: string, orderId: string, message: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order) throw new BadRequestException('Order not found');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order does not belong to this seller');
+    }
+    if (!['FULFILLED', 'WAITING_SELLER'].includes(order.status)) {
+      throw new BadRequestException('Can only message active orders');
+    }
+    await this.telegramService.bot.api.sendMessage(
+      order.buyerTgUserId.toString(),
+      `📢 Pesan dari penjual:\n\n${message}`,
+    );
+    return { success: true };
+  }
+
+  async toggleReminder(sellerId: string, orderId: string, enabled: boolean) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order) throw new BadRequestException('Order not found');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order does not belong to this seller');
+    }
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { reminderEnabled: enabled },
+    });
+    return { success: true, reminderEnabled: enabled };
   }
 }

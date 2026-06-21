@@ -259,6 +259,7 @@ model Order {
   createdAt          DateTime      @default(now())
   fulfilledAt        DateTime?
   accessExpiresAt    DateTime?
+  reminderEnabled    Boolean       @default(false)
   ledgerEntries      LedgerEntry[]
   reports            Report[]
 }

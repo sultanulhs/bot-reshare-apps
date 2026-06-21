@@ -257,6 +257,26 @@ export class SellerController {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
   }
 
+  @Post('orders/:id/message')
+  @UseGuards(ActiveSellerGuard)
+  async sendMessageToBuyer(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { message: string },
+  ) {
+    return this.orderService.sendMessageToBuyer(req.seller.id, id, body.message);
+  }
+
+  @Patch('orders/:id/reminder')
+  @UseGuards(ActiveSellerGuard)
+  async toggleReminder(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { enabled: boolean },
+  ) {
+    return this.orderService.toggleReminder(req.seller.id, id, body.enabled);
+  }
+
   // --- Verification ---
 
   @Post('verify/email/send')

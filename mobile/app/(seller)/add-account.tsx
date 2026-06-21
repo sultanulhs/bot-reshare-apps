@@ -40,6 +40,7 @@ interface ManualOrder {
   fulfilledAt?: string | null;
   accessExpiresAt?: string | null;
   expiresAt?: string | null;
+  reminderEnabled: boolean;
 }
 
 export default function AddAccountScreen() {
@@ -56,6 +57,8 @@ export default function AddAccountScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newHasSubAccounts, setNewHasSubAccounts] = useState(true);
+  const [messageOrderId, setMessageOrderId] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -117,6 +120,20 @@ export default function AddAccountScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
     },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const sendMessage = useMutation({
+    mutationFn: ({ orderId, message }: { orderId: string; message: string }) =>
+      api.post(`/seller/orders/${orderId}/message`, { message }),
+    onSuccess: () => { setMessageOrderId(null); setMessageText(''); Alert.alert('Berhasil', 'Pesan terkirim'); },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const toggleReminder = useMutation({
+    mutationFn: ({ orderId, enabled }: { orderId: string; enabled: boolean }) =>
+      api.patch(`/seller/orders/${orderId}/reminder`, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] }),
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
@@ -268,6 +285,20 @@ export default function AddAccountScreen() {
                 {(order.status === 'PENDING' || order.status === 'EXPIRED') && order.expiresAt && (
                   <Text style={styles.cardMeta}>{order.status === 'PENDING' ? '⏰ Batas bayar' : '❌ Expired'}: {fmtDate(order.expiresAt)}</Text>
                 )}
+                {(order.status === 'FULFILLED' || order.status === 'WAITING_SELLER') && (
+                  <>
+                    <TouchableOpacity style={styles.sendMsgBtn} onPress={() => setMessageOrderId(order.id)}>
+                      <Text style={styles.sendMsgBtnText}>📨 Kirim Pesan</Text>
+                    </TouchableOpacity>
+                    <View style={styles.toggleRow}>
+                      <Text style={styles.toggleLabel}>🔔 Reminder Bulanan</Text>
+                      <Switch
+                        value={order.reminderEnabled}
+                        onValueChange={(val) => toggleReminder.mutate({ orderId: order.id, enabled: val })}
+                      />
+                    </View>
+                  </>
+                )}
               </View>
             );
           })}
@@ -319,6 +350,33 @@ export default function AddAccountScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Kirim Pesan */}
+      <Modal visible={!!messageOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Kirim Pesan ke Pembeli</Text>
+            <TextInput
+              style={[styles.input, { height: 100 }]}
+              placeholder="Tulis pesan..."
+              value={messageText}
+              onChangeText={setMessageText}
+              multiline
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => messageOrderId && sendMessage.mutate({ orderId: messageOrderId, message: messageText })}
+              disabled={sendMessage.isPending}
+            >
+              <Text style={styles.buttonText}>{sendMessage.isPending ? 'Mengirim...' : 'Kirim'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setMessageOrderId(null); setMessageText(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -350,6 +408,8 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
   deleteBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
+  sendMsgBtn: { backgroundColor: '#2563eb', borderRadius: 6, padding: 8, alignItems: 'center', marginTop: 8 },
+  sendMsgBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },

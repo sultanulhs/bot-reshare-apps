@@ -166,6 +166,7 @@ export class StockService {
           fulfilledAt: o.fulfilledAt,
           accessExpiresAt: o.accessExpiresAt,
           expiresAt: o.expiresAt,
+          reminderEnabled: o.reminderEnabled,
         }))
       : [];
 
