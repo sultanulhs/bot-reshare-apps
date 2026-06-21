@@ -326,13 +326,13 @@ export class SellerController {
 
   @Get('orders/:id/warranty-photo')
   @UseGuards(ActiveSellerGuard)
-  async getWarrantyPhoto(@Req() req: any, @Param('id') id: string, @Res() res: any) {
+  async getWarrantyPhoto(@Req() req: any, @Param('id') id: string) {
     const photoUrl = await this.orderService.getWarrantyPhotoUrl(req.seller.id, id);
-    if (!photoUrl) { res.status(404).json({ message: 'No photo' }); return; }
+    if (!photoUrl) throw new BadRequestException('No photo');
     const response = await fetch(photoUrl);
-    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return { base64: buffer.toString('base64'), contentType };
   }
 
   @Post('orders/:id/warranty-verify')
@@ -353,13 +353,13 @@ export class SellerController {
 
   @Get('warranty-photos/:id/image')
   @UseGuards(ActiveSellerGuard)
-  async getWarrantyPhotoImage(@Req() req: any, @Param('id') id: string, @Res() res: any) {
+  async getWarrantyPhotoImage(@Req() req: any, @Param('id') id: string) {
     const photoUrl = await this.orderService.getWarrantyPhotoImageUrl(req.seller.id, id);
-    if (!photoUrl) { res.status(404).json({ message: 'No photo' }); return; }
+    if (!photoUrl) throw new BadRequestException('No photo');
     const response = await fetch(photoUrl);
-    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return { base64: buffer.toString('base64'), contentType };
   }
 
   @Post('store-code')

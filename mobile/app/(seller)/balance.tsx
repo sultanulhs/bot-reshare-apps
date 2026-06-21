@@ -52,9 +52,8 @@ export default function BalanceScreen() {
 
   const viewWarrantyPhoto = async (photoId: string) => {
     try {
-      const res = await api.get(`/seller/warranty-photos/${photoId}/image`, { responseType: 'arraybuffer' });
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(res.data)));
-      setPhotoUri(`data:${res.headers['content-type'] || 'image/jpeg'};base64,${base64}`);
+      const res = await api.get(`/seller/warranty-photos/${photoId}/image`);
+      setPhotoUri(`data:${res.data.contentType};base64,${res.data.base64}`);
     } catch { Alert.alert('Error', 'Gagal memuat foto'); }
   };
 
