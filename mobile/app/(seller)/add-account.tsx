@@ -12,7 +12,9 @@ interface Account {
   email: string;
   password: string;
   status: string;
-  subAccountCount: number;
+  subAvailable: number;
+  subLocked: number;
+  subSold: number;
   createdAt: string;
 }
 
@@ -154,7 +156,7 @@ export default function AddAccountScreen() {
             </View>
             <View style={styles.cardFooter}>
               <Text style={styles.cardMeta}>
-                {item.subAccountCount} sub-akun
+                Sub-akun: {item.subAvailable} tersedia | {item.subLocked} terkunci | {item.subSold} terjual
               </Text>
               <View style={styles.actionRow}>
                 <TouchableOpacity onPress={() => handleEditAccount(item)} style={styles.actionBtn}>

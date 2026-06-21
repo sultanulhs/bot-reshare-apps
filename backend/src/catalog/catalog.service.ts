@@ -90,15 +90,17 @@ export class CatalogService {
 
     const appsWithStock = await Promise.all(
       apps.map(async (app) => {
-        const stockCount = await this.prisma.subAccount.count({
-          where: {
-            status: 'AVAILABLE',
-            deletedAt: null,
-            account: {
-              deletedAt: null,
-              duration: { appId: app.id, deletedAt: null },
-            },
-          },
+        const stockAvailable = await this.prisma.subAccount.count({
+          where: { status: 'AVAILABLE', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
+        });
+        const stockLocked = await this.prisma.subAccount.count({
+          where: { status: 'LOCKED', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
+        });
+        const stockSold = await this.prisma.subAccount.count({
+          where: { status: 'SOLD', deletedAt: null, account: { deletedAt: null, duration: { appId: app.id, deletedAt: null } } },
+        });
+        const accountCount = await this.prisma.account.count({
+          where: { deletedAt: null, duration: { appId: app.id, deletedAt: null } },
         });
         return {
           id: app.id,
@@ -108,7 +110,10 @@ export class CatalogService {
           active: app.active,
           createdAt: app.createdAt,
           _count: { durations: app.durations.length },
-          stockCount,
+          accountCount,
+          stockAvailable,
+          stockLocked,
+          stockSold,
         };
       }),
     );
@@ -168,6 +173,7 @@ export class CatalogService {
     return this.prisma.app.update({
       where: { id },
       data: {
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
     });
@@ -270,8 +276,17 @@ export class CatalogService {
 
     const durationsWithStock = await Promise.all(
       app.durations.map(async (d) => {
-        const stockCount = await this.prisma.subAccount.count({
+        const accountCount = await this.prisma.account.count({
+          where: { durationId: d.id, deletedAt: null },
+        });
+        const stockAvailable = await this.prisma.subAccount.count({
           where: { status: 'AVAILABLE', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
+        });
+        const stockLocked = await this.prisma.subAccount.count({
+          where: { status: 'LOCKED', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
+        });
+        const stockSold = await this.prisma.subAccount.count({
+          where: { status: 'SOLD', deletedAt: null, account: { durationId: d.id, deletedAt: null } },
         });
         return {
           id: d.id,
@@ -280,7 +295,10 @@ export class CatalogService {
           basePrice: d.basePrice,
           productType: d.productType,
           buyerInfoLabel: d.buyerInfoLabel,
-          stockCount,
+          accountCount,
+          stockAvailable,
+          stockLocked,
+          stockSold,
         };
       }),
     );

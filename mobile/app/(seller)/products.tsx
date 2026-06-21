@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { View, Text, SectionList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, SectionList, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator, RefreshControl, Switch } from 'react-native';
 import { useState, useMemo, useCallback } from 'react';
 import { router } from 'expo-router';
 import api from '../../src/lib/api';
@@ -25,7 +25,10 @@ interface App {
   notes?: string;
   active: boolean;
   _count?: { durations: number };
-  stockCount?: number;
+  accountCount?: number;
+  stockAvailable?: number;
+  stockLocked?: number;
+  stockSold?: number;
 }
 
 export default function ProductsScreen() {
@@ -40,6 +43,7 @@ export default function ProductsScreen() {
   const [form, setForm] = useState({ categoryId: '', templateId: '', notes: '' });
   const [editingApp, setEditingApp] = useState<App | null>(null);
   const [editNotes, setEditNotes] = useState('');
+  const [editActive, setEditActive] = useState(true);
 
   const { data: apps, isLoading, refetch } = useQuery<App[]>({
     queryKey: ['seller-apps'],
@@ -78,7 +82,7 @@ export default function ProductsScreen() {
   });
 
   const updateApp = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { notes?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { active?: boolean; notes?: string } }) =>
       api.patch(`/seller/apps/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
@@ -149,11 +153,18 @@ export default function ProductsScreen() {
   const handleEditApp = (app: App) => {
     setEditingApp(app);
     setEditNotes(app.notes || '');
+    setEditActive(app.active);
   };
 
   const handleEditSubmit = () => {
     if (!editingApp) return;
-    updateApp.mutate({ id: editingApp.id, data: { notes: editNotes.trim() || undefined } });
+    updateApp.mutate({
+      id: editingApp.id,
+      data: {
+        active: editActive,
+        notes: editNotes.trim() || undefined,
+      },
+    });
   };
 
   const handleDeleteApp = (app: App) => {
@@ -198,10 +209,13 @@ export default function ProductsScreen() {
         renderItem={({ item }) => {
           const appName = item.template?.name || '-';
           const durationCount = item._count?.durations ?? 0;
-          const stockCount = item.stockCount ?? 0;
+          const accountCount = item.accountCount ?? 0;
+          const stockAvailable = item.stockAvailable ?? 0;
+          const stockLocked = item.stockLocked ?? 0;
+          const stockSold = item.stockSold ?? 0;
           return (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, !item.active && styles.cardInactive]}
               onPress={() =>
                 router.push({
                   pathname: '/(seller)/app-detail',
@@ -220,10 +234,11 @@ export default function ProductsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardMeta}>{durationCount} durasi</Text>
-                <Text style={styles.cardMeta}>{stockCount} stok</Text>
-              </View>
+              {item.notes ? <Text style={styles.cardNotes}>{item.notes}</Text> : null}
+              <Text style={styles.cardMeta}>{durationCount} durasi | {accountCount} akun</Text>
+              <Text style={styles.cardStock}>
+                Tersedia: {stockAvailable} | Terkunci: {stockLocked} | Terjual: {stockSold}
+              </Text>
             </TouchableOpacity>
           );
         }}
@@ -237,6 +252,10 @@ export default function ProductsScreen() {
         <View style={styles.modal}>
           <View style={styles.editModalContent}>
             <Text style={styles.modalTitle}>Edit Aplikasi</Text>
+            <View style={styles.switchRow}>
+              <Text style={styles.label}>Aktif</Text>
+              <Switch value={editActive} onValueChange={setEditActive} />
+            </View>
             <Text style={styles.label}>Notes</Text>
             <TextInput
               style={styles.input}
@@ -463,9 +482,12 @@ const styles = StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
+  cardInactive: { opacity: 0.5 },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
+  cardNotes: { fontSize: 12, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  cardMeta: { fontSize: 12, color: '#888' },
+  cardMeta: { fontSize: 12, color: '#888', marginTop: 6 },
+  cardStock: { fontSize: 11, color: '#666', marginTop: 2 },
   actionRow: { flexDirection: 'row', gap: 8 },
   actionBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   editBtnText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
@@ -475,6 +497,7 @@ const styles = StyleSheet.create({
   modalScroll: { maxHeight: '85%', margin: 16 },
   modalContent: { backgroundColor: '#fff', borderRadius: 12, padding: 24 },
   editModalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   label: { fontSize: 13, color: '#333', marginBottom: 4, fontWeight: '500', marginTop: 8 },
   // Dropdown

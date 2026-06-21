@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ForbiddenException, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { TelegramService } from '../telegram/telegram.service';
 import { AddAccountDto } from './dto/add-account.dto';
 import { AddSubAccountDto } from './dto/add-sub-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
@@ -11,6 +12,8 @@ export class StockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    @Inject(forwardRef(() => TelegramService))
+    private readonly telegramService: TelegramService,
   ) {}
 
   async addAccount(sellerId: string, durationId: string, dto: AddAccountDto) {
@@ -77,7 +80,9 @@ export class StockService {
 
     const accounts = await this.prisma.account.findMany({
       where: { durationId, deletedAt: null },
-      include: { _count: { select: { subAccounts: { where: { deletedAt: null } } } } },
+      include: {
+        subAccounts: { where: { deletedAt: null }, select: { status: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -86,7 +91,9 @@ export class StockService {
       email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
       password: this.crypto.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
       status: a.status,
-      subAccountCount: a._count.subAccounts,
+      subAvailable: a.subAccounts.filter((s) => s.status === 'AVAILABLE').length,
+      subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
+      subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
       createdAt: a.createdAt,
     }));
   }
@@ -128,7 +135,26 @@ export class StockService {
       data.passwordTag = enc.authTag;
     }
 
-    return this.prisma.account.update({ where: { id }, data });
+    const updated = await this.prisma.account.update({ where: { id }, data });
+
+    // Notify buyer if account has a fulfilled order
+    try {
+      const order = await this.prisma.order.findFirst({
+        where: { accountId: id, status: 'FULFILLED' },
+      });
+      if (order) {
+        const newEmail = dto.email || this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
+        const newPassword = dto.password || this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
+        await this.telegramService.bot.api.sendMessage(
+          order.buyerTgUserId.toString(),
+          `⚠️ Info: Kredensial akun yang kamu beli telah diperbarui.\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword}`,
+        );
+      }
+    } catch {
+      // Silently ignore notification failures
+    }
+
+    return updated;
   }
 
   async softDeleteAccount(sellerId: string, id: string) {

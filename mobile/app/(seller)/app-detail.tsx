@@ -24,7 +24,10 @@ interface Duration {
   basePrice: number;
   productType: ProductType;
   buyerInfoLabel?: string;
-  stockCount?: number;
+  accountCount?: number;
+  stockAvailable?: number;
+  stockLocked?: number;
+  stockSold?: number;
 }
 
 interface AppDetail {
@@ -259,8 +262,9 @@ export default function AppDetailScreen() {
               </View>
             </View>
             <Text style={styles.cardPrice}>{formatRupiah(item.basePrice)}</Text>
-            <Text style={styles.cardMeta}>
-              {item.days} hari | {item.stockCount ?? 0} stok
+            <Text style={styles.cardMeta}>{item.accountCount ?? 0} akun</Text>
+            <Text style={styles.cardStock}>
+              Tersedia: {item.stockAvailable ?? 0} | Terkunci: {item.stockLocked ?? 0} | Terjual: {item.stockSold ?? 0}
             </Text>
           </TouchableOpacity>
         )}
@@ -438,6 +442,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, color: '#3730a3', fontWeight: '600' },
   cardPrice: { fontSize: 14, color: '#2563eb', fontWeight: '600', marginTop: 6 },
   cardMeta: { fontSize: 12, color: '#888', marginTop: 4 },
+  cardStock: { fontSize: 11, color: '#666', marginTop: 2 },
   empty: { textAlign: 'center', color: '#999', marginTop: 32 },
   modal: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 },
