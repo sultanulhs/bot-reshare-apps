@@ -128,6 +128,7 @@ export class OrderService {
   async expireOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: { duration: { include: { app: { include: { template: true } } } } },
     });
 
     if (!order || order.status !== 'PENDING') {
@@ -162,9 +163,15 @@ export class OrderService {
     });
 
     try {
+      const appName = order.duration?.app?.template?.name ?? 'Produk';
+      const durationLabel = order.duration?.label ?? '';
+      const price = `Rp${order.totalAmount.toLocaleString('id-ID')}`;
       await this.telegramService.bot.api.sendMessage(
         order.buyerTgUserId.toString(),
-        `❌ Pesanan kamu telah kedaluwarsa karena belum dibayar.\nSilakan buat pesanan baru jika masih berminat.`,
+        `❌ Pesanan kamu telah kedaluwarsa karena belum dibayar.\n\n` +
+        `📦 ${appName}${durationLabel ? ` (${durationLabel})` : ''}\n` +
+        `💰 ${price}\n\n` +
+        `Silakan buat pesanan baru jika masih berminat.`,
       );
     } catch {
       // Silently ignore notification failures
