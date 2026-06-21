@@ -52,21 +52,21 @@ export class OrderService {
       let subAccountId: string | undefined;
 
       if (duration.productType === 'AKUN_READY') {
-        const account = await tx.account.findFirst({
-          where: { durationId: duration.id, status: 'AVAILABLE' },
+        const sub = await tx.subAccount.findFirst({
+          where: {
+            status: 'AVAILABLE',
+            deletedAt: null,
+            account: { durationId: duration.id, deletedAt: null },
+          },
         });
-        if (!account) {
+        if (!sub) {
           throw new BadRequestException('No stock available');
         }
-        await tx.account.update({
-          where: { id: account.id },
+        await tx.subAccount.update({
+          where: { id: sub.id },
           data: { status: 'LOCKED' },
         });
-        await tx.subAccount.updateMany({
-          where: { accountId: account.id },
-          data: { status: 'LOCKED' },
-        });
-        accountId = account.id;
+        subAccountId = sub.id;
       }
       // MANUAL: no account needed
 
@@ -167,6 +167,7 @@ export class OrderService {
       include: {
         duration: { include: { app: { include: { template: true } } } },
         account: true,
+        subAccount: { include: { account: true } },
       },
       orderBy: { accessExpiresAt: 'asc' },
     });

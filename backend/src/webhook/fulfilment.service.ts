@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { TelegramService } from '../telegram/telegram.service';
@@ -11,6 +11,7 @@ export class FulfilmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    @Inject(forwardRef(() => TelegramService))
     private readonly telegram: TelegramService,
     private readonly subscriptionService: SubscriptionService,
   ) {}
@@ -31,7 +32,7 @@ export class FulfilmentService {
       include: {
         duration: { include: { app: { include: { template: true } } } },
         account: { include: { subAccounts: true } },
-        subAccount: true,
+        subAccount: { include: { account: true } },
       },
     });
 
@@ -60,7 +61,11 @@ export class FulfilmentService {
   }
 
   private async fulfilAkunReady(order: any) {
-    const account = order.account;
+    // New model: order links to subAccount, account is on subAccount.account
+    // Legacy model: order links to account directly
+    const subAccount = order.subAccount;
+    const account = subAccount?.account ?? order.account;
+
     if (!account) {
       this.logger.error(`No account linked for AKUN_READY order ${order.id}`);
       await this.setWaitingSeller(order);
@@ -72,8 +77,13 @@ export class FulfilmentService {
 
     let credentialText = `📧 Email: ${email}\n🔑 Password: ${password}`;
 
-    // Include sub-accounts if any
-    if (account.subAccounts && account.subAccounts.length > 0) {
+    if (subAccount) {
+      // New model: send only the specific sub-account purchased
+      const name = this.crypto.decrypt(subAccount.encName, subAccount.nameIv, subAccount.nameTag);
+      const pin = this.crypto.decrypt(subAccount.encPin, subAccount.pinIv, subAccount.pinTag);
+      credentialText += `\n\n👤 Profil: ${name}\n🔐 PIN: ${pin}`;
+    } else if (account.subAccounts && account.subAccounts.length > 0) {
+      // Legacy model: send all sub-accounts
       for (const sub of account.subAccounts) {
         const name = this.crypto.decrypt(sub.encName, sub.nameIv, sub.nameTag);
         const pin = this.crypto.decrypt(sub.encPin, sub.pinIv, sub.pinTag);
@@ -93,16 +103,24 @@ export class FulfilmentService {
         data: { status: 'FULFILLED', fulfilledAt, accessExpiresAt },
       });
 
-      await tx.account.update({
-        where: { id: account.id },
-        data: { status: 'SOLD' },
-      });
-
-      if (account.subAccounts && account.subAccounts.length > 0) {
-        await tx.subAccount.updateMany({
-          where: { accountId: account.id },
+      if (subAccount) {
+        // New model: only mark the specific sub-account as SOLD
+        await tx.subAccount.update({
+          where: { id: subAccount.id },
           data: { status: 'SOLD' },
         });
+      } else if (order.accountId) {
+        // Legacy model: mark account + all sub-accounts as SOLD
+        await tx.account.update({
+          where: { id: account.id },
+          data: { status: 'SOLD' },
+        });
+        if (account.subAccounts && account.subAccounts.length > 0) {
+          await tx.subAccount.updateMany({
+            where: { accountId: account.id },
+            data: { status: 'SOLD' },
+          });
+        }
       }
 
       await tx.ledgerEntry.create({

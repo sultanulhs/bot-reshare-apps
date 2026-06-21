@@ -91,9 +91,9 @@ export class StockService {
       accounts.map(async (a) => {
         const expiredOrders = await this.prisma.order.count({
           where: {
-            accountId: a.id,
             status: 'FULFILLED',
             accessExpiresAt: { lte: now },
+            subAccount: { accountId: a.id },
           },
         });
         return {
@@ -175,25 +175,29 @@ export class StockService {
 
     const updated = await this.prisma.account.update({ where: { id }, data });
 
-    // Notify active (non-expired) buyer if account has a fulfilled order
+    // Notify active (non-expired) buyers if account has fulfilled orders via sub-accounts
     try {
-      const activeOrder = await this.prisma.order.findFirst({
+      const activeOrders = await this.prisma.order.findMany({
         where: {
-          accountId: id,
           status: 'FULFILLED',
+          subAccount: { accountId: id },
           OR: [
             { accessExpiresAt: null },
             { accessExpiresAt: { gt: new Date() } },
           ],
         },
       });
-      if (activeOrder) {
+      if (activeOrders.length > 0) {
         const newEmail = dto.email || this.crypto.decrypt(account.encEmail, account.emailIv, account.emailTag);
         const newPassword = dto.password || this.crypto.decrypt(account.encPassword, account.passwordIv, account.passwordTag);
-        await this.telegramService.bot.api.sendMessage(
-          activeOrder.buyerTgUserId.toString(),
-          `⚠️ Info: Kredensial akun yang kamu beli telah diperbarui.\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword}`,
-        );
+        for (const activeOrder of activeOrders) {
+          try {
+            await this.telegramService.bot.api.sendMessage(
+              activeOrder.buyerTgUserId.toString(),
+              `⚠️ Info: Kredensial akun yang kamu beli telah diperbarui.\n📧 Email: ${newEmail}\n🔑 Password: ${newPassword}`,
+            );
+          } catch { /* ignore per-buyer failure */ }
+        }
       }
     } catch {
       // Silently ignore notification failures
@@ -202,10 +206,9 @@ export class StockService {
     // Reset stock for expired orders after password change
     const now = new Date();
     const expiredOrders = await this.prisma.order.findMany({
-      where: { accountId: id, status: 'FULFILLED', accessExpiresAt: { lte: now } },
+      where: { status: 'FULFILLED', accessExpiresAt: { lte: now }, subAccount: { accountId: id } },
     });
     if (expiredOrders.length > 0) {
-      await this.prisma.account.update({ where: { id }, data: { status: 'AVAILABLE' } });
       for (const order of expiredOrders) {
         if (order.subAccountId) {
           await this.prisma.subAccount.update({

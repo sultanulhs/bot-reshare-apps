@@ -3,12 +3,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BotConfigService } from '../../botconfig/botconfig.service';
 import { CatalogService } from '../../catalog/catalog.service';
 import { OrderService } from '../../order/order.service';
+import { FulfilmentService } from '../../webhook/fulfilment.service';
+
+const isTestPayEnabled = process.env.TEST_PAYMENT_ENABLED === 'true';
 
 export function createBuyerComposer(
   prisma: PrismaService,
   botConfigService: BotConfigService,
   catalogService: CatalogService,
   orderService: OrderService,
+  fulfilmentService: FulfilmentService,
 ) {
   const composer = new Composer();
 
@@ -214,6 +218,10 @@ export function createBuyerComposer(
         sellerId: affiliation.sellerId,
       });
 
+      const qrKeyboard = isTestPayEnabled
+        ? new InlineKeyboard().text('🧪 Simulasi Bayar (Testing)', `testpay_${order.partnerReferenceNo}`)
+        : undefined;
+
       await ctx.replyWithPhoto(
         new InputFile(order.qrImage, 'qris.png'),
         {
@@ -224,10 +232,32 @@ export function createBuyerComposer(
             `Scan QR di atas untuk membayar via DANA.\n` +
             `Order ID: \`${order.orderId}\``,
           parse_mode: 'Markdown',
+          reply_markup: qrKeyboard,
         },
       );
     } catch (err: any) {
       await ctx.reply(`❌ Gagal membuat pesanan: ${err.message}`);
+    }
+  });
+
+  // Test payment handler — only active when TEST_PAYMENT_ENABLED=true
+  composer.callbackQuery(/^testpay_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+
+    if (!isTestPayEnabled) {
+      await ctx.reply('❌ Simulasi pembayaran tidak aktif.');
+      return;
+    }
+
+    const partnerReferenceNo = ctx.match![1];
+
+    try {
+      await fulfilmentService.handlePaymentNotification({
+        originalPartnerReferenceNo: partnerReferenceNo,
+      });
+      await ctx.reply('✅ Pembayaran simulasi berhasil diproses! Cek pesan berikutnya untuk kredensial.');
+    } catch (err: any) {
+      await ctx.reply(`❌ Gagal memproses pembayaran simulasi: ${err.message}`);
     }
   });
 
