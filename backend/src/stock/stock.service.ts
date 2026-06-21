@@ -51,10 +51,11 @@ export class StockService {
         passwordIv: encPassword.iv,
         passwordTag: encPassword.authTag,
         status: 'AVAILABLE',
+        hasSubAccounts: dto.hasSubAccounts ?? true,
       },
     });
 
-    return { accountId: account.id, status: account.status };
+    return { accountId: account.id, status: account.status, hasSubAccounts: account.hasSubAccounts };
   }
 
   async addSubAccount(sellerId: string, accountId: string, dto: AddSubAccountDto) {
@@ -130,6 +131,7 @@ export class StockService {
           email: this.crypto.decrypt(a.encEmail, a.emailIv, a.emailTag),
           password: this.crypto.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
           status: a.status,
+          hasSubAccounts: a.hasSubAccounts,
           subAvailable: a.subAccounts.filter((s) => s.status === 'AVAILABLE').length,
           subLocked: a.subAccounts.filter((s) => s.status === 'LOCKED').length,
           subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,

@@ -211,9 +211,10 @@ model Account {
   encPassword String
   passwordIv  String
   passwordTag String
-  status      StockStatus  @default(AVAILABLE)
-  subAccounts SubAccount[]
-  order       Order?
+  status         StockStatus  @default(AVAILABLE)
+  hasSubAccounts Boolean      @default(true)
+  subAccounts    SubAccount[]
+  order          Order?
   deletedAt   DateTime?
   createdAt   DateTime     @default(now())
 }

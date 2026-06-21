@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Modal, BackHandler, RefreshControl,
+  Alert, Modal, BackHandler, RefreshControl, Switch,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -12,6 +12,7 @@ interface Account {
   email: string;
   password: string;
   status: string;
+  hasSubAccounts: boolean;
   subAvailable: number;
   subLocked: number;
   subSold: number;
@@ -42,16 +43,19 @@ interface ManualOrder {
 }
 
 export default function AddAccountScreen() {
-  const { durationId, durationLabel, appId, appName } = useLocalSearchParams<{
+  const { durationId, durationLabel, appId, appName, productType } = useLocalSearchParams<{
     durationId: string;
     durationLabel: string;
     appId: string;
     appName: string;
+    productType: string;
   }>();
+  const isManual = productType === 'MANUAL';
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newHasSubAccounts, setNewHasSubAccounts] = useState(true);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -85,7 +89,7 @@ export default function AddAccountScreen() {
   }, [refetch]);
 
   const addAccount = useMutation({
-    mutationFn: () => api.post(`/seller/durations/${durationId}/accounts`, { email, password }),
+    mutationFn: () => api.post(`/seller/durations/${durationId}/accounts`, { email, password, hasSubAccounts: newHasSubAccounts }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
       setShowAdd(false);
@@ -154,21 +158,30 @@ export default function AddAccountScreen() {
 
       <Text style={styles.header}>{durationLabel}</Text>
 
-      <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
-        <Text style={styles.addBtnText}>+ Tambah Akun</Text>
-      </TouchableOpacity>
+      {!isManual && (
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
+          <Text style={styles.addBtnText}>+ Tambah Akun</Text>
+        </TouchableOpacity>
+      )}
 
+      {!isManual && (
       <FlatList
         data={accounts}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
-            onPress={() => router.push({
+        renderItem={({ item }) => {
+          const canNavigate = item.hasSubAccounts;
+          const CardWrapper = canNavigate ? TouchableOpacity : View;
+          const cardProps = canNavigate ? {
+            onPress: () => router.push({
               pathname: '/(seller)/sub-accounts',
               params: { accountId: item.id, accountEmail: item.email, durationId, durationLabel, appId: appId!, appName: appName || '' },
-            })}
+            }),
+          } : {};
+          return (
+          <CardWrapper
+            style={[styles.card, (item.expiredCount ?? 0) > 0 && styles.cardExpired]}
+            {...cardProps}
           >
             <View style={styles.cardRow}>
               <View style={{ flex: 1 }}>
@@ -197,7 +210,7 @@ export default function AddAccountScreen() {
               <Text style={styles.expiredBadge}>{item.expiredCount} kadaluarsa</Text>
             )}
             <View style={styles.cardFooter}>
-              {(item.subAvailable + item.subLocked + item.subSold > 0) ? (
+              {item.hasSubAccounts ? (
                 <Text style={styles.cardMeta}>
                   Sub-akun: {item.subAvailable} tersedia | {item.subLocked} terkunci | {item.subSold} terjual
                 </Text>
@@ -213,12 +226,14 @@ export default function AddAccountScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
-        )}
+          </CardWrapper>
+          );
+        }}
         ListEmptyComponent={
           <Text style={styles.empty}>{isLoading ? 'Memuat...' : 'Belum ada akun'}</Text>
         }
       />
+      )}
 
       {/* Manual Orders Section */}
       {manualOrders.length > 0 && (
@@ -285,6 +300,10 @@ export default function AddAccountScreen() {
               onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             <TextInput style={styles.input} placeholder="Password" value={password}
               onChangeText={setPassword} />
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Memiliki Sub-Akun</Text>
+              <Switch value={newHasSubAccounts} onValueChange={setNewHasSubAccounts} />
+            </View>
             <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={addAccount.isPending}>
               <Text style={styles.buttonText}>{addAccount.isPending ? 'Menyimpan...' : 'Simpan'}</Text>
             </TouchableOpacity>
@@ -311,6 +330,8 @@ const styles = StyleSheet.create({
   buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   expiryDate: { color: '#999', fontSize: 11, marginTop: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  toggleLabel: { fontSize: 14, color: '#333' },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardEmail: { fontSize: 15, fontWeight: '600', color: '#111' },

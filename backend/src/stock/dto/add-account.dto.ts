@@ -1,4 +1,4 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsString, MinLength, IsOptional, IsBoolean } from 'class-validator';
 
 export class AddAccountDto {
   @IsString()
@@ -8,4 +8,8 @@ export class AddAccountDto {
   @IsString()
   @MinLength(1)
   password!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hasSubAccounts?: boolean;
 }

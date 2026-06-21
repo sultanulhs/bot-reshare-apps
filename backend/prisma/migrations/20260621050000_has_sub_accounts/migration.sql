@@ -1,0 +1,1 @@
+ALTER TABLE "Account" ADD COLUMN "hasSubAccounts" BOOLEAN NOT NULL DEFAULT true;
