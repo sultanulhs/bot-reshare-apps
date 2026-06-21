@@ -83,10 +83,14 @@ export class FulfilmentService {
 
     const sellerId = order.duration.app.sellerId;
 
+    const fulfilledAt = new Date();
+    const days = order.duration?.days ?? 0;
+    const accessExpiresAt = days > 0 ? new Date(fulfilledAt.getTime() + days * 86400000) : null;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: order.id },
-        data: { status: 'FULFILLED', fulfilledAt: new Date() },
+        data: { status: 'FULFILLED', fulfilledAt, accessExpiresAt },
       });
 
       await tx.account.update({

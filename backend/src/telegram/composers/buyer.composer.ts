@@ -153,10 +153,13 @@ export function createBuyerComposer(
       keyboard.text('\u{2B05}️ Kembali', `cat_${appWithStock.template.category.id}`).row();
     }
 
-    await ctx.reply(
-      `\u{1F4F1} *${appWithStock.template.name}*\n\nPilih durasi langganan:`,
-      { reply_markup: keyboard, parse_mode: 'Markdown' },
-    );
+    let message = `\u{1F4F1} *${appWithStock.template.name}*\n`;
+    if (appWithStock.notes) {
+      message += `\u{1F4DD} Ketentuan: ${appWithStock.notes}\n`;
+    }
+    message += `\nPilih durasi langganan:`;
+
+    await ctx.reply(message, { reply_markup: keyboard, parse_mode: 'Markdown' });
   });
 
   // buy_<durationId> → show detail + confirm button

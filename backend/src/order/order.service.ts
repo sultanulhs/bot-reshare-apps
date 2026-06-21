@@ -156,6 +156,22 @@ export class OrderService {
     });
   }
 
+  async getExpiredAccounts(sellerId: string) {
+    const now = new Date();
+    return this.prisma.order.findMany({
+      where: {
+        status: 'FULFILLED',
+        accessExpiresAt: { lte: now },
+        duration: { app: { sellerId, deletedAt: null } },
+      },
+      include: {
+        duration: { include: { app: { include: { template: true } } } },
+        account: true,
+      },
+      orderBy: { accessExpiresAt: 'asc' },
+    });
+  }
+
   async getSellerPendingFulfillments(sellerId: string) {
     return this.prisma.order.findMany({
       where: {
@@ -191,12 +207,17 @@ export class OrderService {
       throw new BadRequestException('Order does not belong to this seller');
     }
 
+    const fulfilledAt = new Date();
+    const days = order.duration?.days ?? 0;
+    const accessExpiresAt = days > 0 ? new Date(fulfilledAt.getTime() + days * 86400000) : null;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
         data: {
           status: 'FULFILLED',
-          fulfilledAt: new Date(),
+          fulfilledAt,
+          accessExpiresAt,
           sellerNote: credentials,
         },
       });

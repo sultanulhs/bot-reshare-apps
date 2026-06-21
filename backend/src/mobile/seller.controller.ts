@@ -235,6 +235,12 @@ export class SellerController {
 
   // --- Order fulfillment ---
 
+  @Get('expired-accounts')
+  @UseGuards(ActiveSellerGuard)
+  async getExpiredAccounts(@Req() req: any) {
+    return this.orderService.getExpiredAccounts(req.seller.id);
+  }
+
   @Get('pending-orders')
   @UseGuards(ActiveSellerGuard)
   getPendingOrders(@Req() req: any) {

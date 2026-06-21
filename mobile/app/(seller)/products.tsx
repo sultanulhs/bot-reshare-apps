@@ -44,6 +44,11 @@ export default function ProductsScreen() {
   const [editingApp, setEditingApp] = useState<App | null>(null);
   const [editNotes, setEditNotes] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editTemplateId, setEditTemplateId] = useState('');
+  const [editCustomName, setEditCustomName] = useState('');
+  const [showEditCatPicker, setShowEditCatPicker] = useState(false);
+  const [showEditTemplatePicker, setShowEditTemplatePicker] = useState(false);
 
   const { data: apps, isLoading, refetch } = useQuery<App[]>({
     queryKey: ['seller-apps'],
@@ -60,13 +65,19 @@ export default function ProductsScreen() {
   const { data: categories, isLoading: catsLoading } = useQuery<Category[]>({
     queryKey: ['seller-categories'],
     queryFn: () => api.get('/seller/categories').then((r) => r.data),
-    enabled: showAdd,
+    enabled: showAdd || !!editingApp,
   });
 
   const { data: templates, isLoading: templatesLoading } = useQuery<AppTemplate[]>({
     queryKey: ['seller-templates', form.categoryId],
     queryFn: () => api.get(`/seller/templates?categoryId=${form.categoryId}`).then((r) => r.data),
     enabled: !!form.categoryId,
+  });
+
+  const { data: editTemplates, isLoading: editTemplatesLoading } = useQuery<AppTemplate[]>({
+    queryKey: ['seller-templates', editCategoryId],
+    queryFn: () => api.get(`/seller/templates?categoryId=${editCategoryId}`).then((r) => r.data),
+    enabled: !!editCategoryId,
   });
 
   const addApp = useMutation({
@@ -82,12 +93,15 @@ export default function ProductsScreen() {
   });
 
   const updateApp = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { active?: boolean; notes?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { active?: boolean; notes?: string; templateId?: string; categoryId?: string; name?: string } }) =>
       api.patch(`/seller/apps/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller-apps'] });
       setEditingApp(null);
       setEditNotes('');
+      setEditCategoryId('');
+      setEditTemplateId('');
+      setEditCustomName('');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -154,17 +168,27 @@ export default function ProductsScreen() {
     setEditingApp(app);
     setEditNotes(app.notes || '');
     setEditActive(app.active);
+    setEditCategoryId(app.template?.category?.id || '');
+    setEditTemplateId(app.templateId || '');
+    setEditCustomName('');
+    setShowEditCatPicker(false);
+    setShowEditTemplatePicker(false);
   };
 
   const handleEditSubmit = () => {
     if (!editingApp) return;
-    updateApp.mutate({
-      id: editingApp.id,
-      data: {
-        active: editActive,
-        notes: editNotes.trim() || undefined,
-      },
-    });
+    const data: any = {
+      active: editActive,
+      notes: editNotes.trim() || undefined,
+    };
+    // If template changed
+    if (editTemplateId && editTemplateId !== editingApp.templateId) {
+      data.templateId = editTemplateId;
+    } else if (editCustomName.trim() && editCategoryId) {
+      data.categoryId = editCategoryId;
+      data.name = editCustomName.trim();
+    }
+    updateApp.mutate({ id: editingApp.id, data });
   };
 
   const handleDeleteApp = (app: App) => {
@@ -234,7 +258,6 @@ export default function ProductsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              {item.notes ? <Text style={styles.cardNotes}>{item.notes}</Text> : null}
               <Text style={styles.cardMeta}>{durationCount} durasi | {accountCount} akun</Text>
               <Text style={styles.cardStock}>
                 Tersedia: {stockAvailable} | Terkunci: {stockLocked} | Terjual: {stockSold}
@@ -250,12 +273,118 @@ export default function ProductsScreen() {
       {/* Modal Edit Aplikasi */}
       <Modal visible={!!editingApp} animationType="slide" transparent>
         <View style={styles.modal}>
-          <View style={styles.editModalContent}>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit Aplikasi</Text>
             <View style={styles.switchRow}>
               <Text style={styles.label}>Aktif</Text>
               <Switch value={editActive} onValueChange={setEditActive} />
             </View>
+
+            {/* Kategori Selector */}
+            <Text style={styles.label}>Kategori</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => { setShowEditCatPicker(!showEditCatPicker); setShowEditTemplatePicker(false); }}
+            >
+              <Text style={editCategoryId ? styles.dropdownText : styles.dropdownPlaceholder}>
+                {(() => {
+                  const cat = categories?.find((c) => c.id === editCategoryId);
+                  return cat ? `${cat.icon ? cat.icon + ' ' : ''}${cat.name}` : 'Pilih kategori...';
+                })()}
+              </Text>
+              <Text style={styles.dropdownArrow}>{showEditCatPicker ? '^' : 'v'}</Text>
+            </TouchableOpacity>
+
+            {showEditCatPicker && (
+              <View style={styles.dropdownContainer}>
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                  {catsLoading ? (
+                    <ActivityIndicator style={{ padding: 16 }} />
+                  ) : (
+                    categories?.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.dropdownItem, editCategoryId === cat.id && styles.dropdownItemSelected]}
+                        onPress={() => {
+                          setEditCategoryId(cat.id);
+                          setEditTemplateId('');
+                          setEditCustomName('');
+                          setShowEditCatPicker(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, editCategoryId === cat.id && styles.dropdownItemTextSelected]}>
+                          {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Template Selector */}
+            {editCategoryId ? (
+              <>
+                <Text style={styles.label}>Aplikasi</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setShowEditTemplatePicker(!showEditTemplatePicker)}
+                >
+                  <Text style={editTemplateId ? styles.dropdownText : styles.dropdownPlaceholder}>
+                    {(() => {
+                      const tpl = editTemplates?.find((t) => t.id === editTemplateId);
+                      return tpl ? tpl.name : 'Pilih aplikasi...';
+                    })()}
+                  </Text>
+                  <Text style={styles.dropdownArrow}>{showEditTemplatePicker ? '^' : 'v'}</Text>
+                </TouchableOpacity>
+
+                {showEditTemplatePicker && (
+                  <View style={styles.dropdownContainer}>
+                    <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                      {editTemplatesLoading ? (
+                        <ActivityIndicator style={{ padding: 16 }} />
+                      ) : (
+                        editTemplates?.map((tpl) => (
+                          <TouchableOpacity
+                            key={tpl.id}
+                            style={[styles.dropdownItem, editTemplateId === tpl.id && styles.dropdownItemSelected]}
+                            onPress={() => {
+                              setEditTemplateId(tpl.id);
+                              setEditCustomName('');
+                              setShowEditTemplatePicker(false);
+                            }}
+                          >
+                            <Text style={[styles.dropdownItemText, editTemplateId === tpl.id && styles.dropdownItemTextSelected]}>
+                              {tpl.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                    <TouchableOpacity
+                      style={styles.addCatBtn}
+                      onPress={() => {
+                        setEditTemplateId('');
+                        setShowEditTemplatePicker(false);
+                      }}
+                    >
+                      <Text style={styles.addCatBtnText}>+ Nama Custom</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {!editTemplateId && (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nama aplikasi custom"
+                    value={editCustomName}
+                    onChangeText={setEditCustomName}
+                  />
+                )}
+              </>
+            ) : null}
+
             <Text style={styles.label}>Notes</Text>
             <TextInput
               style={styles.input}
@@ -273,10 +402,10 @@ export default function ProductsScreen() {
                 {updateApp.isPending ? 'Menyimpan...' : 'Simpan'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setEditingApp(null); setEditNotes(''); }}>
+            <TouchableOpacity onPress={() => { setEditingApp(null); setEditNotes(''); setEditCategoryId(''); setEditTemplateId(''); setEditCustomName(''); }}>
               <Text style={styles.cancel}>Batal</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 

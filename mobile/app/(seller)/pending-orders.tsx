@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   StyleSheet,
@@ -22,6 +23,18 @@ interface PendingOrder {
   createdAt: string;
 }
 
+interface ExpiredAccount {
+  id: string;
+  accessExpiresAt: string;
+  duration?: {
+    label: string;
+    app: { template: { name: string } };
+  };
+  account?: {
+    id: string;
+  };
+}
+
 export default function PendingOrdersScreen() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
@@ -32,12 +45,17 @@ export default function PendingOrdersScreen() {
     queryFn: () => api.get('/seller/pending-orders').then((r) => r.data),
   });
 
+  const { data: expiredAccounts, refetch: refetchExpired } = useQuery<ExpiredAccount[]>({
+    queryKey: ['seller-expired-accounts'],
+    queryFn: () => api.get('/seller/expired-accounts').then((r) => r.data),
+  });
+
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchExpired()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetch, refetchExpired]);
 
   const fulfillOrder = useMutation({
     mutationFn: (orderId: string) =>
@@ -63,12 +81,34 @@ export default function PendingOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={orders}
+      <SectionList
+        sections={([
+          { title: 'Pesanan Menunggu', data: orders || [], type: 'pending' },
+          { title: 'Akun Kadaluarsa', data: expiredAccounts || [], type: 'expired' },
+        ] as any[]).filter((s: any) => s.data.length > 0)}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        renderItem={({ item }) => {
-          const createdDate = new Date(item.createdAt).toLocaleDateString('id-ID', {
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
+        renderItem={({ item, section }) => {
+          if (section.type === 'expired') {
+            const expired = item as unknown as ExpiredAccount;
+            const appName = expired.duration?.app?.template?.name || '-';
+            const durationLabel = expired.duration?.label || '-';
+            const expiresDate = new Date(expired.accessExpiresAt).toLocaleDateString('id-ID', {
+              day: 'numeric', month: 'short', year: 'numeric',
+            });
+            return (
+              <View style={[styles.card, styles.expiredCard]}>
+                <Text style={styles.cardTitle}>{appName}</Text>
+                <Text style={styles.cardSub}>{durationLabel}</Text>
+                <Text style={styles.expiredDate}>Kadaluarsa: {expiresDate}</Text>
+              </View>
+            );
+          }
+          const pending = item as unknown as PendingOrder;
+          const createdDate = new Date(pending.createdAt).toLocaleDateString('id-ID', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -77,16 +117,16 @@ export default function PendingOrdersScreen() {
           });
           return (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{item.appName || 'Pesanan'}</Text>
-              <Text style={styles.cardSub}>{item.durationLabel || '-'}</Text>
-              {item.buyerInfo && (
+              <Text style={styles.cardTitle}>{pending.appName || 'Pesanan'}</Text>
+              <Text style={styles.cardSub}>{pending.durationLabel || '-'}</Text>
+              {pending.buyerInfo && (
                 <View style={styles.buyerInfoBox}>
                   <Text style={styles.buyerInfoLabel}>Info Pembeli:</Text>
-                  <Text style={styles.buyerInfoText}>{item.buyerInfo}</Text>
+                  <Text style={styles.buyerInfoText}>{pending.buyerInfo}</Text>
                 </View>
               )}
               <Text style={styles.cardDate}>{createdDate}</Text>
-              <TouchableOpacity style={styles.processBtn} onPress={() => setSelectedOrder(item)}>
+              <TouchableOpacity style={styles.processBtn} onPress={() => setSelectedOrder(pending)}>
                 <Text style={styles.processBtnText}>Proses</Text>
               </TouchableOpacity>
             </View>
@@ -151,8 +191,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     elevation: 1,
   },
+  sectionHeader: { fontSize: 15, fontWeight: '600', color: '#333', marginTop: 12, marginBottom: 6, paddingHorizontal: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardSub: { fontSize: 13, color: '#666', marginTop: 4 },
+  expiredCard: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  expiredDate: { fontSize: 12, color: '#ef4444', marginTop: 6, fontWeight: '500' },
   buyerInfoBox: {
     backgroundColor: '#fffbeb',
     borderRadius: 6,

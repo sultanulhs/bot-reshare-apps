@@ -170,11 +170,41 @@ export class CatalogService {
     if (!app) throw new NotFoundException('App not found');
     if (app.sellerId !== sellerId) throw new ForbiddenException('Not your app');
 
+    let templateId: string | undefined;
+
+    if (dto.templateId) {
+      templateId = dto.templateId;
+    } else if (dto.name && dto.categoryId) {
+      const template = await this.prisma.appTemplate.upsert({
+        where: {
+          name_categoryId: { name: dto.name, categoryId: dto.categoryId },
+        },
+        update: {},
+        create: {
+          categoryId: dto.categoryId,
+          name: dto.name,
+          isDefault: false,
+          createdBy: sellerId,
+        },
+      });
+      templateId = template.id;
+    }
+
     return this.prisma.app.update({
       where: { id },
       data: {
         ...(dto.active !== undefined ? { active: dto.active } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(templateId ? { templateId } : {}),
+      },
+      include: {
+        template: {
+          select: {
+            id: true,
+            name: true,
+            category: { select: { id: true, name: true, icon: true } },
+          },
+        },
       },
     });
   }

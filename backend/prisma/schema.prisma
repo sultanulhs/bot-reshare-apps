@@ -254,6 +254,7 @@ model Order {
   expiresAt          DateTime
   createdAt          DateTime      @default(now())
   fulfilledAt        DateTime?
+  accessExpiresAt    DateTime?
   ledgerEntries      LedgerEntry[]
   reports            Report[]
 }
