@@ -165,26 +165,32 @@ export class StockService {
 
     // MANUAL orders for this duration
     const manualOrders = duration.productType === 'MANUAL'
-      ? (await this.prisma.order.findMany({
+      ? await Promise.all((await this.prisma.order.findMany({
           where: { durationId },
           orderBy: { createdAt: 'desc' },
-        })).map((o) => ({
-          id: o.id,
-          status: o.status,
-          buyerName: o.buyerName,
-          buyerUsername: o.buyerUsername,
-          buyerTgUserId: o.buyerTgUserId.toString(),
-          buyerInfo: o.buyerInfo,
-          totalAmount: o.totalAmount,
-          createdAt: o.createdAt,
-          fulfilledAt: o.fulfilledAt,
-          accessExpiresAt: o.accessExpiresAt,
-          expiresAt: o.expiresAt,
-          reminderEnabled: o.reminderEnabled,
-          warrantyStatus: o.warrantyStatus,
-          warrantyPhoto: !!o.warrantyPhoto,
-          warrantyAt: o.warrantyAt,
-          warrantyDeadline: o.warrantyDeadline,
+        })).map(async (o) => {
+          const loginReportCount = await this.prisma.loginReport.count({
+            where: { status: 'PENDING', orderId: o.id },
+          });
+          return {
+            id: o.id,
+            status: o.status,
+            buyerName: o.buyerName,
+            buyerUsername: o.buyerUsername,
+            buyerTgUserId: o.buyerTgUserId.toString(),
+            buyerInfo: o.buyerInfo,
+            totalAmount: o.totalAmount,
+            createdAt: o.createdAt,
+            fulfilledAt: o.fulfilledAt,
+            accessExpiresAt: o.accessExpiresAt,
+            expiresAt: o.expiresAt,
+            reminderEnabled: o.reminderEnabled,
+            warrantyStatus: o.warrantyStatus,
+            warrantyPhoto: !!o.warrantyPhoto,
+            warrantyAt: o.warrantyAt,
+            warrantyDeadline: o.warrantyDeadline,
+            loginReportCount,
+          };
         }))
       : [];
 

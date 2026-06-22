@@ -52,6 +52,7 @@ interface ManualOrder {
   warrantyPhoto?: boolean;
   warrantyAt?: string | null;
   warrantyDeadline?: string | null;
+  loginReportCount?: number;
 }
 
 export default function AddAccountScreen() {
@@ -78,6 +79,10 @@ export default function AddAccountScreen() {
   const [photoHistoryOrderId, setPhotoHistoryOrderId] = useState<string | null>(null);
   const [photoHistory, setPhotoHistory] = useState<Array<{ id: string; fileId: string; status: string; reason: string | null; createdAt: string }>>([]);
   const [loadingPhotoHistory, setLoadingPhotoHistory] = useState(false);
+  const [loginReportOrderId, setLoginReportOrderId] = useState<string | null>(null);
+  const [loginReports, setLoginReports] = useState<any[]>([]);
+  const [resolveReportId, setResolveReportId] = useState<string | null>(null);
+  const [resolveNote, setResolveNote] = useState('');
 
   const viewWarrantyPhoto = async (photoId: string) => {
     try {
@@ -94,6 +99,21 @@ export default function AddAccountScreen() {
       setPhotoHistory(res.data);
     } catch { Alert.alert('Error', 'Gagal memuat riwayat foto'); }
     setLoadingPhotoHistory(false);
+  };
+
+  const openLoginReports = async (orderId: string) => {
+    setLoginReportOrderId(orderId);
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/login-reports`);
+      setLoginReports(res.data);
+    } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
+  };
+
+  const viewLoginReportPhoto = async (reportId: string) => {
+    try {
+      const res = await api.get(`/seller/login-reports/${reportId}/image`);
+      setPhotoUri(`data:${res.data.contentType};base64,${res.data.base64}`);
+    } catch { Alert.alert('Error', 'Gagal memuat foto'); }
   };
 
   const { data: accountData, isLoading, refetch } = useQuery<{ accounts: Account[]; manualOrders: ManualOrder[] }>({
@@ -170,6 +190,19 @@ export default function AddAccountScreen() {
     mutationFn: ({ orderId, enabled }: { orderId: string; enabled: boolean }) =>
       api.patch(`/seller/orders/${orderId}/reminder`, { enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] }),
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const resolveReport = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) =>
+      api.post(`/seller/login-reports/${id}/resolve`, { note }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+      setResolveReportId(null);
+      setResolveNote('');
+      if (loginReportOrderId) openLoginReports(loginReportOrderId);
+      Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+    },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
@@ -297,7 +330,12 @@ export default function AddAccountScreen() {
               <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
             )}
             {(item.loginReportCount ?? 0) > 0 && (
-              <Text style={styles.loginReportBadge}>{item.loginReportCount} laporan login</Text>
+              <TouchableOpacity onPress={() => {
+                // For accounts without sub-accounts, open login reports directly
+                if (!item.hasSubAccounts && item.orderId) openLoginReports(item.orderId);
+              }}>
+                <Text style={styles.loginReportBadge}>{'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login</Text>
+              </TouchableOpacity>
             )}
             <View style={styles.cardFooter}>
               {item.hasSubAccounts ? (
@@ -367,6 +405,7 @@ export default function AddAccountScreen() {
                 <View style={[styles.card, {
                   borderLeftWidth: 3, borderLeftColor: cardBorderColor, backgroundColor: cardBg,
                   ...(order.warrantyStatus === 'SUBMITTED' ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+                  ...((order.loginReportCount ?? 0) > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
                 }]}>
                   <View style={styles.cardRow}>
                     <View style={{ flex: 1 }}>
@@ -437,6 +476,13 @@ export default function AddAccountScreen() {
                         <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{274C}'} Tolak</Text>
                       </TouchableOpacity>
                     </View>
+                  )}
+                  {(order.loginReportCount ?? 0) > 0 && (
+                    <TouchableOpacity onPress={() => openLoginReports(order.id)}>
+                      <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                        {'\u{26A0}\u{FE0F}'} {order.loginReportCount} laporan login
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               );
@@ -557,6 +603,80 @@ export default function AddAccountScreen() {
             )}
             <TouchableOpacity onPress={() => { setPhotoHistoryOrderId(null); setPhotoHistory([]); }}>
               <Text style={[styles.cancel, { marginTop: 16 }]}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Login Reports Modal */}
+      <Modal visible={!!loginReportOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Laporan Login</Text>
+            <FlatList
+              data={loginReports}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item: report }) => (
+                <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: report.status === 'PENDING' ? '#f97316' : '#16a34a' }} />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: report.status === 'PENDING' ? '#f97316' : '#16a34a' }}>
+                        {report.status === 'PENDING' ? 'Menunggu' : 'Diselesaikan'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => viewLoginReportPhoto(report.id)}>
+                      <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Lihat Foto</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                    {new Date(report.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                  </Text>
+                  {report.status === 'RESOLVED' && report.resolvedNote && (
+                    <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>Catatan: {report.resolvedNote}</Text>
+                  )}
+                  {report.status === 'RESOLVED' && report.resolvedAt && (
+                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      Diselesaikan: {new Date(report.resolvedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                    </Text>
+                  )}
+                  {report.status === 'PENDING' && (
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#16a34a', borderRadius: 6, padding: 6, alignItems: 'center', marginTop: 6 }}
+                      onPress={() => setResolveReportId(report.id)}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Selesaikan</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            />
+            <TouchableOpacity onPress={() => { setLoginReportOrderId(null); setLoginReports([]); }}>
+              <Text style={[styles.cancel, { marginTop: 16 }]}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Resolve Report Modal */}
+      <Modal visible={!!resolveReportId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selesaikan Laporan</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              placeholder="Catatan penyelesaian (opsional)"
+              value={resolveNote}
+              onChangeText={setResolveNote}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: '#16a34a' }]}
+              onPress={() => resolveReportId && resolveReport.mutate({ id: resolveReportId, note: resolveNote })}
+              disabled={resolveReport.isPending}>
+              <Text style={styles.buttonText}>{resolveReport.isPending ? 'Menyimpan...' : 'Selesaikan'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setResolveReportId(null); setResolveNote(''); }}>
+              <Text style={styles.cancel}>Batal</Text>
             </TouchableOpacity>
           </View>
         </View>
