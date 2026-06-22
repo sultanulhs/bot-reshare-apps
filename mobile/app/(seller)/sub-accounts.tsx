@@ -25,6 +25,7 @@ interface SubAccount {
   warrantyPhoto?: boolean;
   warrantyAt?: string | null;
   warrantyDeadline?: string | null;
+  loginReportCount?: number;
   createdAt: string;
 }
 
@@ -189,6 +190,7 @@ export default function SubAccountsScreen() {
         renderItem={({ item }) => (
           <View style={[styles.card, item.isExpired && styles.cardExpired, {
             ...(item.warrantyStatus === 'SUBMITTED' ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+            ...((item.loginReportCount ?? 0) > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
           }]}>
             <View style={styles.cardRow}>
               <View style={{ flex: 1 }}>

@@ -129,6 +129,9 @@ export class CatalogService {
         const pendingWarrantyCount = await this.prisma.order.count({
           where: { warrantyStatus: 'SUBMITTED', duration: { appId: app.id, deletedAt: null } },
         });
+        const loginReportCount = await this.prisma.loginReport.count({
+          where: { status: 'PENDING', order: { duration: { appId: app.id } } },
+        });
         return {
           id: app.id,
           templateId: app.templateId,
@@ -143,6 +146,7 @@ export class CatalogService {
           stockSold,
           expiredCount,
           pendingWarrantyCount,
+          loginReportCount,
         };
       }),
     );
@@ -384,6 +388,9 @@ export class CatalogService {
         const pendingWarrantyCount = await this.prisma.order.count({
           where: { warrantyStatus: 'SUBMITTED', durationId: d.id },
         });
+        const loginReportCount = await this.prisma.loginReport.count({
+          where: { status: 'PENDING', order: { durationId: d.id } },
+        });
         return {
           id: d.id,
           label: d.label,
@@ -398,6 +405,7 @@ export class CatalogService {
           stockSold,
           expiredCount,
           pendingWarrantyCount,
+          loginReportCount,
         };
       }),
     );

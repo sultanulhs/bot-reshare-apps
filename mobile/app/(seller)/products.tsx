@@ -31,6 +31,7 @@ interface App {
   stockSold?: number;
   expiredCount?: number;
   pendingWarrantyCount?: number;
+  loginReportCount?: number;
 }
 
 export default function ProductsScreen() {
@@ -241,9 +242,11 @@ export default function ProductsScreen() {
           const stockSold = item.stockSold ?? 0;
           const expiredCount = item.expiredCount ?? 0;
           const pendingWarrantyCount = item.pendingWarrantyCount ?? 0;
+          const loginReportCount = item.loginReportCount ?? 0;
           const cardBorderStyle = {
             ...(expiredCount > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
             ...(pendingWarrantyCount > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+            ...(loginReportCount > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
           };
           return (
             <TouchableOpacity
@@ -275,6 +278,9 @@ export default function ProductsScreen() {
               )}
               {pendingWarrantyCount > 0 && (
                 <Text style={styles.warrantyBadge}>{pendingWarrantyCount} verifikasi</Text>
+              )}
+              {loginReportCount > 0 && (
+                <Text style={styles.loginReportBadge}>{loginReportCount} laporan login</Text>
               )}
             </TouchableOpacity>
           );
@@ -628,6 +634,7 @@ const styles = StyleSheet.create({
   cardInactive: { opacity: 0.5 },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  loginReportBadge: { color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   cardNotes: { fontSize: 12, color: '#666', marginTop: 4 },
   cardRow: { flexDirection: 'row', gap: 12, marginTop: 6 },

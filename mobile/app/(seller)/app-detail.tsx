@@ -32,6 +32,7 @@ interface Duration {
   stockSold?: number;
   expiredCount?: number;
   pendingWarrantyCount?: number;
+  loginReportCount?: number;
 }
 
 interface AppDetail {
@@ -251,9 +252,11 @@ export default function AppDetailScreen() {
           <Text style={styles.sectionHeader}>{title}</Text>
         )}
         renderItem={({ item }) => {
+          const loginReportCount = item.loginReportCount ?? 0;
           const cardBorderStyle = {
             ...((item.expiredCount ?? 0) > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
             ...((item.pendingWarrantyCount ?? 0) > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+            ...(loginReportCount > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
           };
           return (
           <TouchableOpacity
@@ -298,6 +301,9 @@ export default function AppDetailScreen() {
             )}
             {(item.pendingWarrantyCount ?? 0) > 0 && (
               <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
+            )}
+            {loginReportCount > 0 && (
+              <Text style={styles.loginReportBadge}>{loginReportCount} laporan login</Text>
             )}
           </TouchableOpacity>
           );
@@ -505,6 +511,7 @@ const styles = StyleSheet.create({
   },
   expiredBadge: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  loginReportBadge: { color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '600', flex: 1 },
   actionRow: { flexDirection: 'row', gap: 8 },

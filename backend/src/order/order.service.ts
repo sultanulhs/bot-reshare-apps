@@ -518,6 +518,77 @@ export class OrderService implements OnModuleInit {
     return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
   }
 
+  async submitLoginReport(buyerTgUserId: bigint, orderId: string, photoId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: { include: { template: true, seller: true } } } } },
+    });
+    if (!order || order.buyerTgUserId !== buyerTgUserId) throw new BadRequestException('Order not found');
+    if (order.warrantyStatus !== 'PENDING') throw new BadRequestException('Warranty is not pending');
+
+    await this.prisma.loginReport.create({ data: { orderId, photoId } });
+
+    // Notify seller via Telegram
+    const seller = order.duration?.app?.seller;
+    const appName = order.duration?.app?.template?.name ?? 'Produk';
+    const label = order.duration?.label ?? '';
+    const buyerName = order.buyerName ?? `@${order.buyerTgUserId}`;
+    if (seller?.tgUserId) {
+      try {
+        await this.telegramService.bot.api.sendMessage(
+          seller.tgUserId.toString(),
+          `\u{26A0}\u{FE0F} Pembeli *${buyerName}* melapor tidak bisa login\n\n\u{1F4E6} ${appName} (${label})\n\nCek laporan di aplikasi.`,
+          { parse_mode: 'Markdown' },
+        );
+      } catch {}
+    }
+    return { success: true };
+  }
+
+  async getLoginReports(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order || !order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order not found');
+    }
+    return this.prisma.loginReport.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+  }
+
+  async resolveLoginReport(sellerId: string, reportId: string, note?: string) {
+    const report = await this.prisma.loginReport.findUnique({
+      where: { id: reportId },
+      include: { order: { include: { duration: { include: { app: true } } } } },
+    });
+    if (!report || report.order.duration?.app?.sellerId !== sellerId) {
+      throw new BadRequestException('Report not found');
+    }
+    await this.prisma.loginReport.update({
+      where: { id: reportId },
+      data: { status: 'RESOLVED', resolvedNote: note || null, resolvedAt: new Date() },
+    });
+    // Notify buyer
+    try {
+      await this.telegramService.bot.api.sendMessage(
+        report.order.buyerTgUserId.toString(),
+        `\u{2705} Laporan login kamu telah ditangani oleh penjual.${note ? `\n\n\u{1F4DD} Catatan: ${note}` : ''}\n\nSilakan coba login kembali dan aktivasi garansi.`,
+      );
+    } catch {}
+    return { success: true };
+  }
+
+  async getLoginReportImageUrl(sellerId: string, reportId: string): Promise<string | null> {
+    const report = await this.prisma.loginReport.findUnique({
+      where: { id: reportId },
+      include: { order: { include: { duration: { include: { app: true } } } } },
+    });
+    if (!report || report.order.duration?.app?.sellerId !== sellerId) return null;
+    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
+    const fileInfo = await this.telegramService.bot.api.getFile(report.photoId);
+    return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
+  }
+
   async setupWarranty(orderId: string, sellerId: string, fulfilledAt: Date) {
     const seller = await this.prisma.seller.findUnique({ where: { id: sellerId } });
     if (!seller?.warrantyHours) return;

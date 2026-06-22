@@ -362,6 +362,28 @@ export class SellerController {
     return { base64: buffer.toString('base64'), contentType };
   }
 
+  @Get('orders/:id/login-reports')
+  @UseGuards(ActiveSellerGuard)
+  async getLoginReports(@Req() req: any, @Param('id') id: string) {
+    return this.orderService.getLoginReports(req.seller.id, id);
+  }
+
+  @Post('login-reports/:id/resolve')
+  @UseGuards(ActiveSellerGuard)
+  async resolveLoginReport(@Req() req: any, @Param('id') id: string, @Body() body: { note?: string }) {
+    return this.orderService.resolveLoginReport(req.seller.id, id, body.note);
+  }
+
+  @Get('login-reports/:id/image')
+  @UseGuards(ActiveSellerGuard)
+  async getLoginReportImage(@Req() req: any, @Param('id') id: string) {
+    const photoUrl = await this.orderService.getLoginReportImageUrl(req.seller.id, id);
+    if (!photoUrl) throw new BadRequestException('No photo');
+    const response = await fetch(photoUrl);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { base64: buffer.toString('base64'), contentType: response.headers.get('content-type') || 'image/jpeg' };
+  }
+
   @Post('store-code')
   setStoreCode(@Req() req: any, @Body() dto: SetStoreCodeDto) {
     return this.sellerService.setStoreCode(req.user.sub, dto.storeCode);

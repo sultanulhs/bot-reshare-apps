@@ -18,6 +18,7 @@ interface Account {
   subSold: number;
   expiredCount?: number;
   pendingWarrantyCount?: number;
+  loginReportCount?: number;
   isExpired?: boolean;
   buyerTgUserId?: string | null;
   buyerName?: string | null;
@@ -237,6 +238,7 @@ export default function AddAccountScreen() {
             style={[styles.card, {
               ...((item.expiredCount ?? 0) > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
               ...((item.pendingWarrantyCount ?? 0) > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
+              ...((item.loginReportCount ?? 0) > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
             }]}
             {...cardProps}
           >
@@ -293,6 +295,9 @@ export default function AddAccountScreen() {
             )}
             {(item.pendingWarrantyCount ?? 0) > 0 && (
               <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
+            )}
+            {(item.loginReportCount ?? 0) > 0 && (
+              <Text style={styles.loginReportBadge}>{item.loginReportCount} laporan login</Text>
             )}
             <View style={styles.cardFooter}>
               {item.hasSubAccounts ? (
@@ -577,6 +582,7 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '600' },
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, elevation: 1 },
   warrantyBadge: { color: '#3b82f6', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  loginReportBadge: { color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 },
   buyerActive: { color: '#16a34a', fontSize: 12, marginTop: 4 },
   buyerLocked: { color: '#f59e0b', fontSize: 12, marginTop: 4 },
   buyerExpired: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },

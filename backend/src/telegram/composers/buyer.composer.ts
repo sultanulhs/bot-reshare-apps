@@ -11,6 +11,8 @@ const isTestPayEnabled = process.env.TEST_PAYMENT_ENABLED === 'true';
 const pendingManualOrders = new Map<string, { durationId: string; sellerId: string }>();
 // In-memory state for warranty photo uploads
 const pendingWarrantyPhotos = new Map<string, string>(); // tgUserId -> orderId
+// In-memory state for login report photo uploads
+const pendingLoginReports = new Map<string, string>(); // tgUserId -> orderId
 
 export function createBuyerComposer(
   prisma: PrismaService,
@@ -469,6 +471,7 @@ export function createBuyerComposer(
         keyboard.text(`\u{23F3} ${name}${label ? ` (${label})` : ''} — Menunggu Verifikasi`, `warranty_info_${o.id}`).row();
       } else {
         keyboard.text(`\u{1F4F8} ${name}${label ? ` (${label})` : ''}`, `warranty_${o.id}`).row();
+        keyboard.text(`\u{274C} Tidak Bisa Login`, `loginreport_${o.id}`).row();
       }
     }
     await ctx.reply('\u{1F6E1}\u{FE0F} *Aktivasi Garansi*\n\nPilih pesanan untuk mengirim screenshot login:', {
@@ -482,6 +485,14 @@ export function createBuyerComposer(
     await ctx.reply('⏳ Foto garansi kamu sudah dikirim dan sedang menunggu verifikasi dari penjual.');
   });
 
+  // Login report — select order and prompt for screenshot
+  composer.callbackQuery(/^loginreport_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const orderId = ctx.match![1];
+    pendingLoginReports.set(ctx.from.id.toString(), orderId);
+    await ctx.reply('\u{1F4F8} Kirim foto screenshot error login kamu sekarang.', { parse_mode: 'Markdown' });
+  });
+
   // Warranty — select order and prompt for photo
   composer.callbackQuery(/^warranty_(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
@@ -490,9 +501,25 @@ export function createBuyerComposer(
     await ctx.reply('\u{1F4F8} Kirim foto screenshot login kamu sekarang.\n\n_Pastikan foto menunjukkan halaman utama setelah login._', { parse_mode: 'Markdown' });
   });
 
-  // Warranty — handle photo upload
+  // Warranty / Login Report — handle photo upload
   composer.on('message:photo', async (ctx) => {
     const tgUserId = ctx.from.id.toString();
+
+    // Check login report first
+    const loginReportOrderId = pendingLoginReports.get(tgUserId);
+    if (loginReportOrderId) {
+      pendingLoginReports.delete(tgUserId);
+      const photos = ctx.message.photo;
+      const fileId = photos[photos.length - 1].file_id;
+      try {
+        await orderService.submitLoginReport(BigInt(ctx.from.id), loginReportOrderId, fileId);
+        await ctx.reply('\u{2705} Laporan telah dikirim ke penjual. Tunggu respon dari penjual.');
+      } catch (err: any) {
+        await ctx.reply(`\u{274C} Gagal mengirim laporan: ${err.message}`);
+      }
+      return;
+    }
+
     const orderId = pendingWarrantyPhotos.get(tgUserId);
     if (!orderId) return;
     pendingWarrantyPhotos.delete(tgUserId);

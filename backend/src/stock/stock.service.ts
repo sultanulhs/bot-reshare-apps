@@ -124,6 +124,9 @@ export class StockService {
         const pendingWarranty = await this.prisma.order.count({
           where: { warrantyStatus: 'SUBMITTED', OR: [{ subAccount: { accountId: a.id } }, { accountId: a.id }] },
         });
+        const loginReportCount = await this.prisma.loginReport.count({
+          where: { status: 'PENDING', order: { OR: [{ subAccount: { accountId: a.id } }, { accountId: a.id }] } },
+        });
         const isExpired = !!(
           a.order &&
           a.order.status === 'FULFILLED' &&
@@ -141,6 +144,7 @@ export class StockService {
           subSold: a.subAccounts.filter((s) => s.status === 'SOLD').length,
           expiredCount: expiredOrders,
           pendingWarrantyCount: pendingWarranty,
+          loginReportCount,
           isExpired,
           buyerTgUserId: a.order?.buyerTgUserId?.toString() || null,
           buyerName: a.order?.buyerName || null,
@@ -212,13 +216,16 @@ export class StockService {
     });
 
     const now = new Date();
-    return subAccounts.map((s) => {
+    return Promise.all(subAccounts.map(async (s) => {
       const isExpired = !!(
         s.order &&
         s.order.status === 'FULFILLED' &&
         s.order.accessExpiresAt &&
         s.order.accessExpiresAt <= now
       );
+      const loginReportCount = s.order ? await this.prisma.loginReport.count({
+        where: { status: 'PENDING', orderId: s.order.id },
+      }) : 0;
       return {
         id: s.id,
         name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
@@ -237,9 +244,10 @@ export class StockService {
         warrantyPhoto: !!s.order?.warrantyPhoto,
         warrantyAt: s.order?.warrantyAt || null,
         warrantyDeadline: s.order?.warrantyDeadline || null,
+        loginReportCount,
         createdAt: s.createdAt,
       };
-    });
+    }));
   }
 
   async updateAccount(sellerId: string, id: string, dto: UpdateAccountDto) {
