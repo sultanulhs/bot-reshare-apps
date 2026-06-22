@@ -26,10 +26,10 @@ export default function ProfileScreen() {
   const [warrantyHours, setWarrantyHours] = useState('');
 
   useEffect(() => {
-    if (me?.warrantyHours !== undefined) {
-      setWarrantyHours(me.warrantyHours ? String(me.warrantyHours) : '');
+    if (me) {
+      setWarrantyHours(me.warrantyHours != null ? String(me.warrantyHours) : '');
     }
-  }, [me?.warrantyHours]);
+  }, [me]);
 
   const saveWarranty = useMutation({
     mutationFn: (hours: number | null) => api.patch('/seller/warranty', { hours }),

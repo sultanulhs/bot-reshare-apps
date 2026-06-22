@@ -124,6 +124,7 @@ export class CatalogService {
             status: 'FULFILLED',
             accessExpiresAt: { lte: new Date() },
             duration: { appId: app.id, deletedAt: null },
+            OR: [{ subAccountId: { not: null } }, { accountId: { not: null } }],
           },
         });
         const pendingWarrantyCount = await this.prisma.order.count({
@@ -383,6 +384,7 @@ export class CatalogService {
             status: 'FULFILLED',
             accessExpiresAt: { lte: new Date() },
             durationId: d.id,
+            OR: [{ subAccountId: { not: null } }, { accountId: { not: null } }],
           },
         });
         const pendingWarrantyCount = await this.prisma.order.count({
