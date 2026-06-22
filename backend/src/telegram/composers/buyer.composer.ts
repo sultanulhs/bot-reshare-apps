@@ -528,13 +528,18 @@ export function createBuyerComposer(
     // Check login report first
     const loginReportOrderId = pendingLoginReports.get(tgUserId);
     if (loginReportOrderId) {
-      pendingLoginReports.delete(tgUserId);
       const photos = ctx.message.photo;
       const fileId = photos[photos.length - 1].file_id;
+      const caption = ctx.message.caption || undefined;
       try {
-        await orderService.submitLoginReport(BigInt(ctx.from.id), loginReportOrderId, fileId);
-        await ctx.reply('\u{2705} Laporan telah dikirim ke penjual. Tunggu respon dari penjual.');
+        const result = await orderService.submitLoginReport(BigInt(ctx.from.id), loginReportOrderId, fileId, caption);
+        if (result.isNew) {
+          await ctx.reply('\u{2705} Laporan login telah dibuat. Kirim foto lain jika perlu, atau tunggu respon penjual.');
+        } else {
+          await ctx.reply('\u{1F4F8} Foto ditambahkan ke laporan. Kirim foto lain jika perlu.');
+        }
       } catch (err: any) {
+        pendingLoginReports.delete(tgUserId);
         await ctx.reply(`\u{274C} Gagal mengirim laporan: ${err.message}`);
       }
       return;

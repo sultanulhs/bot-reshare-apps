@@ -293,16 +293,25 @@ model WarrantyPhoto {
 }
 
 model LoginReport {
-  id           String    @id @default(cuid())
+  id           String             @id @default(cuid())
   orderId      String
-  order        Order     @relation(fields: [orderId], references: [id])
-  photoId      String
-  status       String    @default("PENDING")
+  order        Order              @relation(fields: [orderId], references: [id])
+  photos       LoginReportPhoto[]
+  status       String             @default("PENDING")
   resolvedNote String?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime           @default(now())
   resolvedAt   DateTime?
 
   @@index([orderId])
+}
+
+model LoginReportPhoto {
+  id        String      @id @default(cuid())
+  reportId  String
+  report    LoginReport @relation(fields: [reportId], references: [id])
+  fileId    String
+  caption   String?
+  createdAt DateTime    @default(now())
 }
 
 model LedgerEntry {

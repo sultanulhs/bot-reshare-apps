@@ -111,9 +111,9 @@ export default function AddAccountScreen() {
     } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
   };
 
-  const viewLoginReportPhoto = async (reportId: string) => {
+  const viewLoginReportPhoto = async (photoId: string) => {
     try {
-      const res = await api.get(`/seller/login-reports/${reportId}/image`);
+      const res = await api.get(`/seller/login-report-photos/${photoId}/image`);
       setPhotoUri(`data:${res.data.contentType};base64,${res.data.base64}`);
     } catch { Alert.alert('Error', 'Gagal memuat foto'); }
   };
@@ -649,13 +649,21 @@ export default function AddAccountScreen() {
                         {report.status === 'PENDING' ? 'Menunggu' : 'Diselesaikan'}
                       </Text>
                     </View>
-                    <TouchableOpacity onPress={() => viewLoginReportPhoto(report.id)}>
-                      <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Lihat Foto</Text>
-                    </TouchableOpacity>
                   </View>
                   <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                     {new Date(report.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                   </Text>
+                  {report.photos?.map((photo: any) => (
+                    <View key={photo.id} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <TouchableOpacity onPress={() => viewLoginReportPhoto(photo.id)}>
+                        <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Foto</Text>
+                      </TouchableOpacity>
+                      {photo.caption && <Text style={{ fontSize: 11, color: '#666', marginLeft: 8, flex: 1 }}>{photo.caption}</Text>}
+                      <Text style={{ fontSize: 10, color: '#999', marginLeft: 4 }}>
+                        {new Date(photo.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                      </Text>
+                    </View>
+                  ))}
                   {report.status === 'RESOLVED' && report.resolvedNote && (
                     <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>Catatan: {report.resolvedNote}</Text>
                   )}

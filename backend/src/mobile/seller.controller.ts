@@ -386,10 +386,10 @@ export class SellerController {
     return this.orderService.replaceOrderStock(req.seller.id, id, body.stockId, body.stockType);
   }
 
-  @Get('login-reports/:id/image')
+  @Get('login-report-photos/:id/image')
   @UseGuards(ActiveSellerGuard)
-  async getLoginReportImage(@Req() req: any, @Param('id') id: string) {
-    const photoUrl = await this.orderService.getLoginReportImageUrl(req.seller.id, id);
+  async getLoginReportPhotoImage(@Req() req: any, @Param('id') id: string) {
+    const photoUrl = await this.orderService.getLoginReportPhotoUrl(req.seller.id, id);
     if (!photoUrl) throw new BadRequestException('No photo');
     const response = await fetch(photoUrl);
     const buffer = Buffer.from(await response.arrayBuffer());

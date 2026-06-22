@@ -518,15 +518,29 @@ export class OrderService implements OnModuleInit {
     return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
   }
 
-  async submitLoginReport(buyerTgUserId: bigint, orderId: string, photoId: string) {
+  async submitLoginReport(buyerTgUserId: bigint, orderId: string, fileId: string, caption?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
     if (!order || order.buyerTgUserId !== buyerTgUserId) throw new BadRequestException('Order not found');
     if (order.warrantyStatus !== 'PENDING') throw new BadRequestException('Warranty is not pending');
 
-    await this.prisma.loginReport.create({ data: { orderId, photoId } });
-    return { success: true };
+    // Find or create pending report for this order
+    let report = await this.prisma.loginReport.findFirst({
+      where: { orderId, status: 'PENDING' },
+    });
+
+    const isNew = !report;
+    if (!report) {
+      report = await this.prisma.loginReport.create({ data: { orderId } });
+    }
+
+    // Add photo to the report
+    await this.prisma.loginReportPhoto.create({
+      data: { reportId: report.id, fileId, caption: caption || null },
+    });
+
+    return { success: true, isNew };
   }
 
   async getLoginReports(sellerId: string, orderId: string) {
@@ -537,7 +551,11 @@ export class OrderService implements OnModuleInit {
     if (!order || !order.duration || order.duration.app.sellerId !== sellerId) {
       throw new BadRequestException('Order not found');
     }
-    return this.prisma.loginReport.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.loginReport.findMany({
+      where: { orderId },
+      include: { photos: { orderBy: { createdAt: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async resolveLoginReport(sellerId: string, reportId: string, note?: string) {
@@ -562,14 +580,14 @@ export class OrderService implements OnModuleInit {
     return { success: true };
   }
 
-  async getLoginReportImageUrl(sellerId: string, reportId: string): Promise<string | null> {
-    const report = await this.prisma.loginReport.findUnique({
-      where: { id: reportId },
-      include: { order: { include: { duration: { include: { app: true } } } } },
+  async getLoginReportPhotoUrl(sellerId: string, photoId: string): Promise<string | null> {
+    const photo = await this.prisma.loginReportPhoto.findUnique({
+      where: { id: photoId },
+      include: { report: { include: { order: { include: { duration: { include: { app: true } } } } } } },
     });
-    if (!report || report.order.duration?.app?.sellerId !== sellerId) return null;
+    if (!photo || photo.report.order.duration?.app?.sellerId !== sellerId) return null;
     const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')!;
-    const fileInfo = await this.telegramService.bot.api.getFile(report.photoId);
+    const fileInfo = await this.telegramService.bot.api.getFile(photo.fileId);
     return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
   }
 
