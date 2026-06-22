@@ -521,27 +521,11 @@ export class OrderService implements OnModuleInit {
   async submitLoginReport(buyerTgUserId: bigint, orderId: string, photoId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { duration: { include: { app: { include: { template: true, seller: true } } } } },
     });
     if (!order || order.buyerTgUserId !== buyerTgUserId) throw new BadRequestException('Order not found');
     if (order.warrantyStatus !== 'PENDING') throw new BadRequestException('Warranty is not pending');
 
     await this.prisma.loginReport.create({ data: { orderId, photoId } });
-
-    // Notify seller via Telegram
-    const seller = order.duration?.app?.seller;
-    const appName = order.duration?.app?.template?.name ?? 'Produk';
-    const label = order.duration?.label ?? '';
-    const buyerName = order.buyerName ?? `@${order.buyerTgUserId}`;
-    if (seller?.tgUserId) {
-      try {
-        await this.telegramService.bot.api.sendMessage(
-          seller.tgUserId.toString(),
-          `\u{26A0}\u{FE0F} Pembeli *${buyerName}* melapor tidak bisa login\n\n\u{1F4E6} ${appName} (${label})\n\nCek laporan di aplikasi.`,
-          { parse_mode: 'Markdown' },
-        );
-      } catch {}
-    }
     return { success: true };
   }
 

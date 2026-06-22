@@ -60,7 +60,7 @@ export function createBuyerComposer(
         .row()
         .text('\u{1F4E6} Pesanan Saya', 'myorders')
         .row()
-        .text('\u{1F6E1}\u{FE0F} Garansi', 'warranty');
+        .text('\u{1F6E1}\u{FE0F} Garansi & Komplain', 'warranty');
 
       await ctx.reply(
         `${welcomeText}\n\n\u{1F3EA} Toko: ${affiliation.seller.storeName}\n\nPilih menu di bawah:`,
@@ -460,29 +460,49 @@ export function createBuyerComposer(
       include: { duration: { include: { app: { include: { template: true } } } } },
     });
     if (orders.length === 0) {
-      await ctx.reply('\u{2705} Tidak ada pesanan yang memerlukan aktivasi garansi.');
+      await ctx.reply('\u{2705} Tidak ada pesanan yang memerlukan aksi garansi atau komplain.');
       return;
     }
     const keyboard = new InlineKeyboard();
     for (const o of orders) {
       const name = o.duration?.app?.template?.name ?? 'Pesanan';
       const label = o.duration?.label ?? '';
-      if (o.warrantyStatus === 'SUBMITTED') {
-        keyboard.text(`\u{23F3} ${name}${label ? ` (${label})` : ''} — Menunggu Verifikasi`, `warranty_info_${o.id}`).row();
-      } else {
-        keyboard.text(`\u{1F4F8} ${name}${label ? ` (${label})` : ''}`, `warranty_${o.id}`).row();
-        keyboard.text(`\u{274C} Tidak Bisa Login`, `loginreport_${o.id}`).row();
-      }
+      const statusTag = o.warrantyStatus === 'SUBMITTED' ? ' \u{23F3}' : '';
+      keyboard.text(`\u{1F4F1} ${name}${label ? ` (${label})` : ''}${statusTag}`, `warranty_select_${o.id}`).row();
     }
-    await ctx.reply('\u{1F6E1}\u{FE0F} *Aktivasi Garansi*\n\nPilih pesanan untuk mengirim screenshot login:', {
+    await ctx.reply('\u{1F6E1}\u{FE0F} *Garansi & Komplain*\n\nPilih produk yang dibeli:', {
       reply_markup: keyboard, parse_mode: 'Markdown',
     });
   });
 
-  // Warranty — info for submitted orders
-  composer.callbackQuery(/^warranty_info_(.+)$/, async (ctx) => {
+  // Warranty — select action for an order (Aktivasi or Komplain)
+  composer.callbackQuery(/^warranty_select_(.+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('⏳ Foto garansi kamu sudah dikirim dan sedang menunggu verifikasi dari penjual.');
+    const orderId = ctx.match![1];
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: { include: { template: true } } } } },
+    });
+    if (!order) { await ctx.reply('\u{274C} Pesanan tidak ditemukan.'); return; }
+
+    const name = order.duration?.app?.template?.name ?? 'Pesanan';
+    const label = order.duration?.label ?? '';
+    const keyboard = new InlineKeyboard();
+
+    if (order.warrantyStatus === 'SUBMITTED') {
+      await ctx.reply(
+        `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\n\u{23F3} Foto garansi sudah dikirim, menunggu verifikasi penjual.\n\nJika ada masalah lain, kirim komplain:`,
+        { parse_mode: 'Markdown', reply_markup: keyboard.text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`) },
+      );
+    } else {
+      keyboard
+        .text('\u{1F4F8} Aktivasi Garansi', `warranty_${orderId}`).row()
+        .text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`);
+      await ctx.reply(
+        `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\nPilih aksi:`,
+        { parse_mode: 'Markdown', reply_markup: keyboard },
+      );
+    }
   });
 
   // Login report — select order and prompt for screenshot
