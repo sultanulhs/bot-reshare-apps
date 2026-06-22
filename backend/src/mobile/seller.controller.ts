@@ -374,6 +374,18 @@ export class SellerController {
     return this.orderService.resolveLoginReport(req.seller.id, id, body.note);
   }
 
+  @Get('orders/:id/available-replacements')
+  @UseGuards(ActiveSellerGuard)
+  async getAvailableReplacements(@Req() req: any, @Param('id') id: string) {
+    return this.orderService.getAvailableReplacements(req.seller.id, id);
+  }
+
+  @Post('orders/:id/replace-stock')
+  @UseGuards(ActiveSellerGuard)
+  async replaceStock(@Req() req: any, @Param('id') id: string, @Body() body: { stockId: string; stockType: 'subAccount' | 'account' }) {
+    return this.orderService.replaceOrderStock(req.seller.id, id, body.stockId, body.stockType);
+  }
+
   @Get('login-reports/:id/image')
   @UseGuards(ActiveSellerGuard)
   async getLoginReportImage(@Req() req: any, @Param('id') id: string) {

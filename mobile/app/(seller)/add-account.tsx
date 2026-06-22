@@ -83,6 +83,8 @@ export default function AddAccountScreen() {
   const [loginReports, setLoginReports] = useState<any[]>([]);
   const [resolveReportId, setResolveReportId] = useState<string | null>(null);
   const [resolveNote, setResolveNote] = useState('');
+  const [replaceOrderId, setReplaceOrderId] = useState<string | null>(null);
+  const [replacements, setReplacements] = useState<any[]>([]);
 
   const viewWarrantyPhoto = async (photoId: string) => {
     try {
@@ -114,6 +116,14 @@ export default function AddAccountScreen() {
       const res = await api.get(`/seller/login-reports/${reportId}/image`);
       setPhotoUri(`data:${res.data.contentType};base64,${res.data.base64}`);
     } catch { Alert.alert('Error', 'Gagal memuat foto'); }
+  };
+
+  const openReplacements = async (orderId: string) => {
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/available-replacements`);
+      setReplacements(res.data);
+      setReplaceOrderId(orderId);
+    } catch { Alert.alert('Error', 'Gagal memuat stok pengganti'); }
   };
 
   const { data: accountData, isLoading, refetch } = useQuery<{ accounts: Account[]; manualOrders: ManualOrder[] }>({
@@ -202,6 +212,20 @@ export default function AddAccountScreen() {
       setResolveNote('');
       if (loginReportOrderId) openLoginReports(loginReportOrderId);
       Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const replaceStock = useMutation({
+    mutationFn: ({ orderId, stockId, stockType }: { orderId: string; stockId: string; stockType: string }) =>
+      api.post(`/seller/orders/${orderId}/replace-stock`, { stockId, stockType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+      setReplaceOrderId(null);
+      setReplacements([]);
+      setLoginReportOrderId(null);
+      setLoginReports([]);
+      Alert.alert('Berhasil', 'Akun berhasil diganti. Kredensial baru telah dikirim ke pembeli.');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -641,17 +665,55 @@ export default function AddAccountScreen() {
                     </Text>
                   )}
                   {report.status === 'PENDING' && (
-                    <TouchableOpacity
-                      style={{ backgroundColor: '#16a34a', borderRadius: 6, padding: 6, alignItems: 'center', marginTop: 6 }}
-                      onPress={() => setResolveReportId(report.id)}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Selesaikan</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#16a34a', borderRadius: 6, padding: 6, alignItems: 'center', flex: 1 }}
+                        onPress={() => setResolveReportId(report.id)}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Selesaikan</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#2563eb', borderRadius: 6, padding: 6, alignItems: 'center', flex: 1 }}
+                        onPress={() => openReplacements(loginReportOrderId!)}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{1F504}'} Ganti Akun</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               )}
             />
             <TouchableOpacity onPress={() => { setLoginReportOrderId(null); setLoginReports([]); }}>
               <Text style={[styles.cancel, { marginTop: 16 }]}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Replace Stock Modal */}
+      <Modal visible={!!replaceOrderId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Pilih Akun Pengganti</Text>
+            {replacements.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Tidak ada stok tersedia</Text>
+            ) : (
+              <FlatList
+                data={replacements}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                    onPress={() => Alert.alert('Ganti Akun', `Yakin ganti ke ${item.email}?`, [
+                      { text: 'Batal', style: 'cancel' },
+                      { text: 'Ganti', onPress: () => replaceStock.mutate({ orderId: replaceOrderId!, stockId: item.id, stockType: item.type }) },
+                    ])}>
+                    <Text style={{ fontSize: 14, fontWeight: '600' }}>{item.email}</Text>
+                    {item.name && <Text style={{ fontSize: 12, color: '#666' }}>Profil: {item.name}</Text>}
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity onPress={() => { setReplaceOrderId(null); setReplacements([]); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 16 }}>Batal</Text>
             </TouchableOpacity>
           </View>
         </View>

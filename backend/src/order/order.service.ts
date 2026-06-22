@@ -573,6 +573,125 @@ export class OrderService implements OnModuleInit {
     return `https://api.telegram.org/file/bot${botToken}/${fileInfo.file_path}`;
   }
 
+  async getAvailableReplacements(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } }, subAccount: { include: { account: true } }, account: true },
+    });
+    if (!order || !order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order not found');
+    }
+
+    if (order.subAccountId) {
+      // Sub-account order: find other AVAILABLE sub-accounts in same duration
+      const subs = await this.prisma.subAccount.findMany({
+        where: {
+          status: 'AVAILABLE', deletedAt: null,
+          id: { not: order.subAccountId }, // exclude current
+          account: { durationId: order.durationId!, deletedAt: null },
+        },
+        include: { account: true },
+      });
+      return subs.map(s => ({
+        id: s.id,
+        type: 'subAccount' as const,
+        email: this.cryptoService.decrypt(s.account.encEmail, s.account.emailIv, s.account.emailTag),
+        password: this.cryptoService.decrypt(s.account.encPassword, s.account.passwordIv, s.account.passwordTag),
+        name: this.cryptoService.decrypt(s.encName, s.nameIv, s.nameTag),
+        pin: this.cryptoService.decrypt(s.encPin, s.pinIv, s.pinTag),
+      }));
+    } else if (order.accountId) {
+      // Account-only order: find other AVAILABLE accounts without sub-accounts in same duration
+      const accs = await this.prisma.account.findMany({
+        where: {
+          status: 'AVAILABLE', deletedAt: null,
+          durationId: order.durationId!,
+          id: { not: order.accountId },
+          subAccounts: { none: { deletedAt: null } },
+        },
+      });
+      return accs.map(a => ({
+        id: a.id,
+        type: 'account' as const,
+        email: this.cryptoService.decrypt(a.encEmail, a.emailIv, a.emailTag),
+        password: this.cryptoService.decrypt(a.encPassword, a.passwordIv, a.passwordTag),
+      }));
+    }
+    return [];
+  }
+
+  async replaceOrderStock(sellerId: string, orderId: string, stockId: string, stockType: 'subAccount' | 'account') {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: { include: { template: true } } } } },
+    });
+    if (!order || order.status !== 'FULFILLED') throw new BadRequestException('Order not found or not fulfilled');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) throw new BadRequestException('Not your order');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Release old stock
+      if (order.subAccountId) {
+        await tx.subAccount.update({ where: { id: order.subAccountId }, data: { status: 'AVAILABLE' } });
+      }
+      if (order.accountId) {
+        await tx.account.update({ where: { id: order.accountId }, data: { status: 'AVAILABLE' } });
+      }
+
+      // Assign new stock
+      if (stockType === 'subAccount') {
+        await tx.subAccount.update({ where: { id: stockId }, data: { status: 'SOLD' } });
+        await tx.order.update({
+          where: { id: orderId },
+          data: { subAccountId: stockId, accountId: null, warrantyStatus: 'PENDING', warrantyPhoto: null, warrantyAt: null },
+        });
+      } else {
+        await tx.account.update({ where: { id: stockId }, data: { status: 'SOLD' } });
+        await tx.order.update({
+          where: { id: orderId },
+          data: { accountId: stockId, subAccountId: null, warrantyStatus: 'PENDING', warrantyPhoto: null, warrantyAt: null },
+        });
+      }
+
+      // Resolve all pending login reports
+      await tx.loginReport.updateMany({
+        where: { orderId, status: 'PENDING' },
+        data: { status: 'RESOLVED', resolvedNote: 'Akun diganti oleh penjual', resolvedAt: new Date() },
+      });
+    });
+
+    // Send new credentials to buyer
+    try {
+      let credentialText = '';
+      if (stockType === 'subAccount') {
+        const sub = await this.prisma.subAccount.findUnique({ where: { id: stockId }, include: { account: true } });
+        if (sub) {
+          const email = this.cryptoService.decrypt(sub.account.encEmail, sub.account.emailIv, sub.account.emailTag);
+          const password = this.cryptoService.decrypt(sub.account.encPassword, sub.account.passwordIv, sub.account.passwordTag);
+          const name = this.cryptoService.decrypt(sub.encName, sub.nameIv, sub.nameTag);
+          const pin = this.cryptoService.decrypt(sub.encPin, sub.pinIv, sub.pinTag);
+          credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}\n\u{1F464} Profil: ${name}\n\u{1F510} PIN: ${pin}`;
+        }
+      } else {
+        const acc = await this.prisma.account.findUnique({ where: { id: stockId } });
+        if (acc) {
+          const email = this.cryptoService.decrypt(acc.encEmail, acc.emailIv, acc.emailTag);
+          const password = this.cryptoService.decrypt(acc.encPassword, acc.passwordIv, acc.passwordTag);
+          credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}`;
+        }
+      }
+
+      const appName = order.duration?.app?.template?.name ?? 'Produk';
+      const label = order.duration?.label ?? '';
+      await this.telegramService.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        `\u{1F504} *Akun kamu telah diganti*\n\n\u{1F4E6} ${appName} (${label})\n\n${credentialText}\n\n\u{1F4F8} Silakan login dan aktivasi garansi kembali.`,
+        { parse_mode: 'Markdown' },
+      );
+    } catch {}
+
+    return { success: true };
+  }
+
   async setupWarranty(orderId: string, sellerId: string, fulfilledAt: Date) {
     const seller = await this.prisma.seller.findUnique({ where: { id: sellerId } });
     if (!seller?.warrantyHours) return;
