@@ -347,6 +347,11 @@ export class StockService {
             data: { status: 'AVAILABLE' },
           });
         }
+        // Detach order from stock so expiredCount resets
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { subAccountId: null, accountId: null },
+        });
       }
     }
 
@@ -440,6 +445,11 @@ export class StockService {
     });
     if (expiredOrder) {
       await this.prisma.subAccount.update({ where: { id }, data: { status: 'AVAILABLE' } });
+      // Detach order from stock so expiredCount resets
+      await this.prisma.order.update({
+        where: { id: expiredOrder.id },
+        data: { subAccountId: null },
+      });
     }
 
     return updated;
