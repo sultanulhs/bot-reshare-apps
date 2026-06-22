@@ -19,6 +19,7 @@ interface Account {
   expiredCount?: number;
   pendingWarrantyCount?: number;
   loginReportCount?: number;
+  totalLoginReportCount?: number;
   isExpired?: boolean;
   buyerTgUserId?: string | null;
   buyerName?: string | null;
@@ -53,6 +54,7 @@ interface ManualOrder {
   warrantyAt?: string | null;
   warrantyDeadline?: string | null;
   loginReportCount?: number;
+  totalLoginReportCount?: number;
 }
 
 export default function AddAccountScreen() {
@@ -361,6 +363,13 @@ export default function AddAccountScreen() {
                 <Text style={styles.loginReportBadge}>{'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login</Text>
               </TouchableOpacity>
             )}
+            {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && (
+              <TouchableOpacity onPress={() => {
+                if (!item.hasSubAccounts && item.orderId) openLoginReports(item.orderId);
+              }}>
+                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F4CB}'} Riwayat Laporan</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.cardFooter}>
               {item.hasSubAccounts ? (
                 <Text style={styles.cardMeta}>
@@ -505,6 +514,13 @@ export default function AddAccountScreen() {
                     <TouchableOpacity onPress={() => openLoginReports(order.id)}>
                       <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
                         {'\u{26A0}\u{FE0F}'} {order.loginReportCount} laporan login
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {(order.loginReportCount ?? 0) === 0 && (order.totalLoginReportCount ?? 0) > 0 && (
+                    <TouchableOpacity onPress={() => openLoginReports(order.id)}>
+                      <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                        {'\u{1F4CB}'} Riwayat Laporan
                       </Text>
                     </TouchableOpacity>
                   )}

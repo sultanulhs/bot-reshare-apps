@@ -133,6 +133,9 @@ export class CatalogService {
         const loginReportCount = await this.prisma.loginReport.count({
           where: { status: 'PENDING', order: { duration: { appId: app.id } } },
         });
+        const totalLoginReportCount = await this.prisma.loginReport.count({
+          where: { order: { duration: { appId: app.id } } },
+        });
         return {
           id: app.id,
           templateId: app.templateId,
@@ -148,6 +151,7 @@ export class CatalogService {
           expiredCount,
           pendingWarrantyCount,
           loginReportCount,
+          totalLoginReportCount,
         };
       }),
     );
@@ -393,6 +397,9 @@ export class CatalogService {
         const loginReportCount = await this.prisma.loginReport.count({
           where: { status: 'PENDING', order: { durationId: d.id } },
         });
+        const totalLoginReportCount = await this.prisma.loginReport.count({
+          where: { order: { durationId: d.id } },
+        });
         return {
           id: d.id,
           label: d.label,
@@ -408,6 +415,7 @@ export class CatalogService {
           expiredCount,
           pendingWarrantyCount,
           loginReportCount,
+          totalLoginReportCount,
         };
       }),
     );

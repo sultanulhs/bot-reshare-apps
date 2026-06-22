@@ -38,6 +38,12 @@ export default function BalanceScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoHistoryOrderId, setPhotoHistoryOrderId] = useState<string | null>(null);
   const [photoHistory, setPhotoHistory] = useState<any[]>([]);
+  const [loginReportOrderId, setLoginReportOrderId] = useState<string | null>(null);
+  const [loginReports, setLoginReports] = useState<any[]>([]);
+  const [resolveReportId, setResolveReportId] = useState<string | null>(null);
+  const [resolveNote, setResolveNote] = useState('');
+  const [replaceOrderId, setReplaceOrderId] = useState<string | null>(null);
+  const [replacements, setReplacements] = useState<any[]>([]);
 
   const verifyWarranty = useMutation({
     mutationFn: ({ orderId, approved, reason }: { orderId: string; approved: boolean; reason?: string }) =>
@@ -64,6 +70,56 @@ export default function BalanceScreen() {
       setPhotoHistory(res.data);
     } catch { Alert.alert('Error', 'Gagal memuat riwayat'); }
   };
+
+  const openLoginReports = async (orderId: string) => {
+    setLoginReportOrderId(orderId);
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/login-reports`);
+      setLoginReports(res.data);
+    } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
+  };
+
+  const viewLoginReportPhoto = async (photoId: string) => {
+    try {
+      const res = await api.get(`/seller/login-report-photos/${photoId}/image`);
+      setPhotoUri(`data:${res.data.contentType};base64,${res.data.base64}`);
+    } catch { Alert.alert('Error', 'Gagal memuat foto'); }
+  };
+
+  const openReplacements = async (orderId: string) => {
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/available-replacements`);
+      setReplacements(res.data);
+      setReplaceOrderId(orderId);
+    } catch { Alert.alert('Error', 'Gagal memuat stok pengganti'); }
+  };
+
+  const resolveReport = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) =>
+      api.post(`/seller/login-reports/${id}/resolve`, { note }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sales'] });
+      setResolveReportId(null);
+      setResolveNote('');
+      if (loginReportOrderId) openLoginReports(loginReportOrderId);
+      Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
+  const replaceStock = useMutation({
+    mutationFn: ({ orderId, stockId, stockType }: { orderId: string; stockId: string; stockType: string }) =>
+      api.post(`/seller/orders/${orderId}/replace-stock`, { stockId, stockType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-sales'] });
+      setReplaceOrderId(null);
+      setReplacements([]);
+      setLoginReportOrderId(null);
+      setLoginReports([]);
+      Alert.alert('Berhasil', 'Akun berhasil diganti. Kredensial baru telah dikirim ke pembeli.');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
 
   useEffect(() => {
     // Scroll so current month is visible near the right edge (before year picker)
@@ -197,6 +253,13 @@ export default function BalanceScreen() {
                   <Text style={{ color: '#2563eb', fontSize: 11 }}>{'\u{1F4F7}'} Riwayat Foto</Text>
                 </TouchableOpacity>
               )}
+              {(item.loginReportCount ?? 0) > 0 && (
+                <TouchableOpacity onPress={() => openLoginReports(item.orderId)}>
+                  <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                    {'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           );
         }}
@@ -258,6 +321,126 @@ export default function BalanceScreen() {
             />
             <TouchableOpacity onPress={() => { setPhotoHistoryOrderId(null); setPhotoHistory([]); }}>
               <Text style={{ textAlign: 'center', color: '#666', marginTop: 16 }}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Login Reports Modal */}
+      <Modal visible={!!loginReportOrderId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Laporan Login</Text>
+            <FlatList
+              data={loginReports}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item: report }) => (
+                <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: report.status === 'PENDING' ? '#f97316' : '#16a34a' }} />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: report.status === 'PENDING' ? '#f97316' : '#16a34a' }}>
+                        {report.status === 'PENDING' ? 'Menunggu' : 'Diselesaikan'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                    {new Date(report.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                  </Text>
+                  {report.photos?.map((photo: any) => (
+                    <View key={photo.id} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <TouchableOpacity onPress={() => viewLoginReportPhoto(photo.id)}>
+                        <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Foto</Text>
+                      </TouchableOpacity>
+                      {photo.caption && <Text style={{ fontSize: 11, color: '#666', marginLeft: 8, flex: 1 }}>{photo.caption}</Text>}
+                      <Text style={{ fontSize: 10, color: '#999', marginLeft: 4 }}>
+                        {new Date(photo.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                      </Text>
+                    </View>
+                  ))}
+                  {report.status === 'RESOLVED' && report.resolvedNote && (
+                    <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>Catatan: {report.resolvedNote}</Text>
+                  )}
+                  {report.status === 'RESOLVED' && report.resolvedAt && (
+                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      Diselesaikan: {new Date(report.resolvedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                    </Text>
+                  )}
+                  {report.status === 'PENDING' && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#16a34a', borderRadius: 6, padding: 6, alignItems: 'center', flex: 1 }}
+                        onPress={() => setResolveReportId(report.id)}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{2705}'} Selesaikan</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#2563eb', borderRadius: 6, padding: 6, alignItems: 'center', flex: 1 }}
+                        onPress={() => openReplacements(loginReportOrderId!)}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{1F504}'} Ganti Akun</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            />
+            <TouchableOpacity onPress={() => { setLoginReportOrderId(null); setLoginReports([]); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 16 }}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Replace Stock Modal */}
+      <Modal visible={!!replaceOrderId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Pilih Akun Pengganti</Text>
+            {replacements.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Tidak ada stok tersedia</Text>
+            ) : (
+              <FlatList
+                data={replacements}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                    onPress={() => Alert.alert('Ganti Akun', `Yakin ganti ke ${item.email}?`, [
+                      { text: 'Batal', style: 'cancel' },
+                      { text: 'Ganti', onPress: () => replaceStock.mutate({ orderId: replaceOrderId!, stockId: item.id, stockType: item.type }) },
+                    ])}>
+                    <Text style={{ fontSize: 14, fontWeight: '600' }}>{item.email}</Text>
+                    {item.name && <Text style={{ fontSize: 12, color: '#666' }}>Profil: {item.name}</Text>}
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity onPress={() => { setReplaceOrderId(null); setReplacements([]); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 16 }}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Resolve Report Modal */}
+      <Modal visible={!!resolveReportId} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Selesaikan Laporan</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12, minHeight: 80, textAlignVertical: 'top' }}
+              placeholder="Catatan penyelesaian (opsional)"
+              value={resolveNote}
+              onChangeText={setResolveNote}
+              multiline
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: '#16a34a', borderRadius: 8, padding: 12, alignItems: 'center' }}
+              onPress={() => resolveReportId && resolveReport.mutate({ id: resolveReportId, note: resolveNote })}
+              disabled={resolveReport.isPending}>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>{resolveReport.isPending ? 'Menyimpan...' : 'Selesaikan'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setResolveReportId(null); setResolveNote(''); }}>
+              <Text style={{ textAlign: 'center', color: '#666', marginTop: 12 }}>Batal</Text>
             </TouchableOpacity>
           </View>
         </View>

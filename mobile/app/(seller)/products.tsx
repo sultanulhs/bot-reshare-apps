@@ -32,6 +32,7 @@ interface App {
   expiredCount?: number;
   pendingWarrantyCount?: number;
   loginReportCount?: number;
+  totalLoginReportCount?: number;
 }
 
 export default function ProductsScreen() {
@@ -243,6 +244,7 @@ export default function ProductsScreen() {
           const expiredCount = item.expiredCount ?? 0;
           const pendingWarrantyCount = item.pendingWarrantyCount ?? 0;
           const loginReportCount = item.loginReportCount ?? 0;
+          const totalLoginReportCount = item.totalLoginReportCount ?? 0;
           const cardBorderStyle = {
             ...(expiredCount > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
             ...(pendingWarrantyCount > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
@@ -281,6 +283,9 @@ export default function ProductsScreen() {
               )}
               {loginReportCount > 0 && (
                 <Text style={styles.loginReportBadge}>{loginReportCount} laporan login</Text>
+              )}
+              {loginReportCount === 0 && totalLoginReportCount > 0 && (
+                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F4CB}'} Riwayat Laporan</Text>
               )}
             </TouchableOpacity>
           );

@@ -127,6 +127,9 @@ export class StockService {
         const loginReportCount = await this.prisma.loginReport.count({
           where: { status: 'PENDING', order: { OR: [{ subAccount: { accountId: a.id } }, { accountId: a.id }] } },
         });
+        const totalLoginReportCount = await this.prisma.loginReport.count({
+          where: { order: { OR: [{ subAccount: { accountId: a.id } }, { accountId: a.id }] } },
+        });
         const isExpired = !!(
           a.order &&
           a.order.status === 'FULFILLED' &&
@@ -145,6 +148,7 @@ export class StockService {
           expiredCount: expiredOrders,
           pendingWarrantyCount: pendingWarranty,
           loginReportCount,
+          totalLoginReportCount,
           isExpired,
           buyerTgUserId: a.order?.buyerTgUserId?.toString() || null,
           buyerName: a.order?.buyerName || null,
@@ -172,6 +176,9 @@ export class StockService {
           const loginReportCount = await this.prisma.loginReport.count({
             where: { status: 'PENDING', orderId: o.id },
           });
+          const totalLoginReportCount = await this.prisma.loginReport.count({
+            where: { orderId: o.id },
+          });
           return {
             id: o.id,
             status: o.status,
@@ -190,6 +197,7 @@ export class StockService {
             warrantyAt: o.warrantyAt,
             warrantyDeadline: o.warrantyDeadline,
             loginReportCount,
+            totalLoginReportCount,
           };
         }))
       : [];
@@ -232,6 +240,9 @@ export class StockService {
       const loginReportCount = s.order ? await this.prisma.loginReport.count({
         where: { status: 'PENDING', orderId: s.order.id },
       }) : 0;
+      const totalLoginReportCount = s.order ? await this.prisma.loginReport.count({
+        where: { orderId: s.order.id },
+      }) : 0;
       return {
         id: s.id,
         name: this.crypto.decrypt(s.encName, s.nameIv, s.nameTag),
@@ -251,6 +262,7 @@ export class StockService {
         warrantyAt: s.order?.warrantyAt || null,
         warrantyDeadline: s.order?.warrantyDeadline || null,
         loginReportCount,
+        totalLoginReportCount,
         createdAt: s.createdAt,
       };
     }));

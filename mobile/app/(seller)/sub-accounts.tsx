@@ -26,6 +26,7 @@ interface SubAccount {
   warrantyAt?: string | null;
   warrantyDeadline?: string | null;
   loginReportCount?: number;
+  totalLoginReportCount?: number;
   createdAt: string;
 }
 
@@ -301,6 +302,13 @@ export default function SubAccountsScreen() {
                   <TouchableOpacity onPress={() => openLoginReports(item.orderId!)}>
                     <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
                       {'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && item.orderId && (
+                  <TouchableOpacity onPress={() => openLoginReports(item.orderId!)}>
+                    <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                      {'\u{1F4CB}'} Riwayat Laporan
                     </Text>
                   </TouchableOpacity>
                 )}

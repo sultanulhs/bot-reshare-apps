@@ -35,20 +35,24 @@ export class LedgerService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return orders.map((o) => ({
-      orderId: o.id,
-      productTitle: o.duration?.app?.template?.name ?? 'Unknown',
-      durationLabel: o.duration?.label ?? null,
-      status: o.status,
-      totalAmount: o.totalAmount,
-      buyerName: o.buyerName ?? null,
-      buyerUsername: o.buyerUsername ?? null,
-      buyerTgUserId: o.buyerTgUserId.toString(),
-      createdAt: o.createdAt,
-      expiresAt: o.expiresAt,
-      fulfilledAt: o.fulfilledAt,
-      accessExpiresAt: o.accessExpiresAt,
-      warrantyStatus: o.warrantyStatus,
+    return Promise.all(orders.map(async (o) => {
+      const loginReportCount = await this.prisma.loginReport.count({ where: { orderId: o.id } });
+      return {
+        orderId: o.id,
+        productTitle: o.duration?.app?.template?.name ?? 'Unknown',
+        durationLabel: o.duration?.label ?? null,
+        status: o.status,
+        totalAmount: o.totalAmount,
+        buyerName: o.buyerName ?? null,
+        buyerUsername: o.buyerUsername ?? null,
+        buyerTgUserId: o.buyerTgUserId.toString(),
+        createdAt: o.createdAt,
+        expiresAt: o.expiresAt,
+        fulfilledAt: o.fulfilledAt,
+        accessExpiresAt: o.accessExpiresAt,
+        warrantyStatus: o.warrantyStatus,
+        loginReportCount,
+      };
     }));
   }
 }

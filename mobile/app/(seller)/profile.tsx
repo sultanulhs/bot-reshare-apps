@@ -58,6 +58,8 @@ export default function ProfileScreen() {
   const { data: me, refetch: refetchMe } = useQuery({
     queryKey: ['seller-me'],
     queryFn: () => api.get('/seller/me').then((r) => r.data),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: subscription, refetch: refetchSub } = useQuery({
