@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { AuthContext, AuthUser, RegisterData } from '../lib/auth';
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.3:3000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.16.0.81:3000/api';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
