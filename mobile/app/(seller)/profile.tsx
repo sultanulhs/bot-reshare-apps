@@ -25,12 +25,6 @@ export default function ProfileScreen() {
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [warrantyHours, setWarrantyHours] = useState('');
 
-  useEffect(() => {
-    if (me) {
-      setWarrantyHours(me.warrantyHours != null ? String(me.warrantyHours) : '');
-    }
-  }, [me]);
-
   const saveWarranty = useMutation({
     mutationFn: (hours: number | null) => api.patch('/seller/warranty', { hours }),
     onSuccess: () => {
@@ -61,6 +55,10 @@ export default function ProfileScreen() {
     staleTime: 0,
     refetchOnMount: 'always',
   });
+
+  useEffect(() => {
+    setWarrantyHours(me?.warrantyHours != null ? String(me.warrantyHours) : '');
+  }, [me?.warrantyHours]);
 
   const { data: subscription, refetch: refetchSub } = useQuery({
     queryKey: ['seller-subscription'],

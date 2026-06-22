@@ -36,7 +36,10 @@ export class LedgerService {
     });
 
     return Promise.all(orders.map(async (o) => {
-      const loginReportCount = await this.prisma.loginReport.count({ where: { orderId: o.id } });
+      const [pendingLoginReportCount, totalLoginReportCount] = await Promise.all([
+        this.prisma.loginReport.count({ where: { orderId: o.id, status: 'PENDING' } }),
+        this.prisma.loginReport.count({ where: { orderId: o.id } }),
+      ]);
       return {
         orderId: o.id,
         productTitle: o.duration?.app?.template?.name ?? 'Unknown',
@@ -51,7 +54,8 @@ export class LedgerService {
         fulfilledAt: o.fulfilledAt,
         accessExpiresAt: o.accessExpiresAt,
         warrantyStatus: o.warrantyStatus,
-        loginReportCount,
+        loginReportCount: pendingLoginReportCount,
+        totalLoginReportCount,
       };
     }));
   }

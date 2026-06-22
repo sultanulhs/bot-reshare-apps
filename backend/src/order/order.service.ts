@@ -50,6 +50,12 @@ export class OrderService implements OnModuleInit {
       repeat: { pattern: '0 9 1 * *' },
       removeOnComplete: true,
     });
+
+    // Seed access expiry scan job (every 10 minutes)
+    await this.expiryQueue.add('scan-access-expiry', {}, {
+      repeat: { pattern: '*/10 * * * *' },
+      removeOnComplete: true,
+    });
   }
 
   async createOrder(params: CreateOrderParams) {
@@ -646,13 +652,29 @@ export class OrderService implements OnModuleInit {
     if (!order || order.status !== 'FULFILLED') throw new BadRequestException('Order not found or not fulfilled');
     if (!order.duration || order.duration.app.sellerId !== sellerId) throw new BadRequestException('Not your order');
 
+    // Capture old credential label before replacing
+    let oldCredLabel = '';
+    if (order.subAccountId) {
+      const oldSub = await this.prisma.subAccount.findUnique({ where: { id: order.subAccountId }, include: { account: true } });
+      if (oldSub) {
+        const oldEmail = this.cryptoService.decrypt(oldSub.account.encEmail, oldSub.account.emailIv, oldSub.account.emailTag);
+        const oldName = this.cryptoService.decrypt(oldSub.encName, oldSub.nameIv, oldSub.nameTag);
+        oldCredLabel = `${oldEmail} / ${oldName}`;
+      }
+    } else if (order.accountId) {
+      const oldAcc = await this.prisma.account.findUnique({ where: { id: order.accountId } });
+      if (oldAcc) {
+        oldCredLabel = this.cryptoService.decrypt(oldAcc.encEmail, oldAcc.emailIv, oldAcc.emailTag);
+      }
+    }
+
     await this.prisma.$transaction(async (tx) => {
-      // Release old stock
+      // Release old stock as NEEDS_REPAIR (not AVAILABLE)
       if (order.subAccountId) {
-        await tx.subAccount.update({ where: { id: order.subAccountId }, data: { status: 'AVAILABLE' } });
+        await tx.subAccount.update({ where: { id: order.subAccountId }, data: { status: 'NEEDS_REPAIR' } });
       }
       if (order.accountId) {
-        await tx.account.update({ where: { id: order.accountId }, data: { status: 'AVAILABLE' } });
+        await tx.account.update({ where: { id: order.accountId }, data: { status: 'NEEDS_REPAIR' } });
       }
 
       // Assign new stock
@@ -670,34 +692,45 @@ export class OrderService implements OnModuleInit {
         });
       }
 
-      // Resolve all pending login reports
+      // Resolve all pending login reports (temporary note)
       await tx.loginReport.updateMany({
         where: { orderId, status: 'PENDING' },
         data: { status: 'RESOLVED', resolvedNote: 'Akun diganti oleh penjual', resolvedAt: new Date() },
       });
     });
 
+    // Build new credential label and update resolvedNote with from→to info
+    let newCredLabel = '';
+    let credentialText = '';
+    if (stockType === 'subAccount') {
+      const sub = await this.prisma.subAccount.findUnique({ where: { id: stockId }, include: { account: true } });
+      if (sub) {
+        const email = this.cryptoService.decrypt(sub.account.encEmail, sub.account.emailIv, sub.account.emailTag);
+        const password = this.cryptoService.decrypt(sub.account.encPassword, sub.account.passwordIv, sub.account.passwordTag);
+        const name = this.cryptoService.decrypt(sub.encName, sub.nameIv, sub.nameTag);
+        const pin = this.cryptoService.decrypt(sub.encPin, sub.pinIv, sub.pinTag);
+        newCredLabel = `${email} / ${name}`;
+        credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}\n\u{1F464} Profil: ${name}\n\u{1F510} PIN: ${pin}`;
+      }
+    } else {
+      const acc = await this.prisma.account.findUnique({ where: { id: stockId } });
+      if (acc) {
+        const email = this.cryptoService.decrypt(acc.encEmail, acc.emailIv, acc.emailTag);
+        const password = this.cryptoService.decrypt(acc.encPassword, acc.passwordIv, acc.passwordTag);
+        newCredLabel = email;
+        credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}`;
+      }
+    }
+
+    // Update resolvedNote with from→to info
+    const replaceNote = `Akun diganti: ${oldCredLabel} → ${newCredLabel}`;
+    await this.prisma.loginReport.updateMany({
+      where: { orderId, status: 'RESOLVED', resolvedNote: 'Akun diganti oleh penjual' },
+      data: { resolvedNote: replaceNote },
+    });
+
     // Send new credentials to buyer
     try {
-      let credentialText = '';
-      if (stockType === 'subAccount') {
-        const sub = await this.prisma.subAccount.findUnique({ where: { id: stockId }, include: { account: true } });
-        if (sub) {
-          const email = this.cryptoService.decrypt(sub.account.encEmail, sub.account.emailIv, sub.account.emailTag);
-          const password = this.cryptoService.decrypt(sub.account.encPassword, sub.account.passwordIv, sub.account.passwordTag);
-          const name = this.cryptoService.decrypt(sub.encName, sub.nameIv, sub.nameTag);
-          const pin = this.cryptoService.decrypt(sub.encPin, sub.pinIv, sub.pinTag);
-          credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}\n\u{1F464} Profil: ${name}\n\u{1F510} PIN: ${pin}`;
-        }
-      } else {
-        const acc = await this.prisma.account.findUnique({ where: { id: stockId } });
-        if (acc) {
-          const email = this.cryptoService.decrypt(acc.encEmail, acc.emailIv, acc.emailTag);
-          const password = this.cryptoService.decrypt(acc.encPassword, acc.passwordIv, acc.passwordTag);
-          credentialText = `\u{1F4E7} Email: ${email}\n\u{1F511} Password: ${password}`;
-        }
-      }
-
       const appName = order.duration?.app?.template?.name ?? 'Produk';
       const label = order.duration?.label ?? '';
       await this.telegramService.bot.api.sendMessage(
@@ -707,6 +740,97 @@ export class OrderService implements OnModuleInit {
       );
     } catch {}
 
+    return { success: true };
+  }
+
+  async expireAccessStock() {
+    const now = new Date();
+    const orders = await this.prisma.order.findMany({
+      where: {
+        status: 'FULFILLED',
+        accessExpiresAt: { lte: now },
+        OR: [
+          { subAccount: { status: 'SOLD' } },
+          { account: { status: 'SOLD' } },
+        ],
+      },
+      select: { id: true, subAccountId: true, accountId: true },
+    });
+
+    for (const order of orders) {
+      if (order.subAccountId) {
+        await this.prisma.subAccount.update({
+          where: { id: order.subAccountId },
+          data: { status: 'EXPIRED' },
+        });
+      }
+      if (order.accountId) {
+        await this.prisma.account.update({
+          where: { id: order.accountId },
+          data: { status: 'EXPIRED' },
+        });
+      }
+    }
+
+    if (orders.length > 0) {
+      this.logger.log(`Expired stock for ${orders.length} orders`);
+    }
+  }
+
+  async replaceManualOrder(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: { include: { template: true } } } } },
+    });
+    if (!order || order.status !== 'FULFILLED') throw new BadRequestException('Order not found or not fulfilled');
+    if (!order.duration || order.duration.app.sellerId !== sellerId) throw new BadRequestException('Not your order');
+    if (order.duration.productType !== 'MANUAL') throw new BadRequestException('Not a manual order');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Resolve all pending login reports
+      await tx.loginReport.updateMany({
+        where: { orderId, status: 'PENDING' },
+        data: { status: 'RESOLVED', resolvedNote: 'Akun diganti — minta info baru', resolvedAt: new Date() },
+      });
+
+      // Reset order to WAITING_SELLER so seller can re-fulfill
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'WAITING_SELLER',
+          buyerInfo: null,
+          fulfilledAt: null,
+          accessExpiresAt: null,
+        },
+      });
+    });
+
+    // Send message to buyer with inline button to send new info
+    try {
+      const appName = order.duration?.app?.template?.name ?? 'Produk';
+      const label = order.duration?.label ?? '';
+      const keyboard = {
+        inline_keyboard: [[{ text: '\u{1F4DD} Kirim Info Baru', callback_data: `manual_reinfo_${orderId}` }]],
+      };
+      await this.telegramService.bot.api.sendMessage(
+        order.buyerTgUserId.toString(),
+        `\u{1F504} *Akun diganti*\n\n\u{1F4E6} ${appName}${label ? ` (${label})` : ''}\n\nPenjual telah mengganti akun. Silakan kirim info baru kamu.`,
+        { parse_mode: 'Markdown', reply_markup: keyboard },
+      );
+    } catch {}
+
+    return { success: true };
+  }
+
+  async updateManualBuyerInfo(orderId: string, buyerInfo: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.status !== 'WAITING_SELLER') {
+      throw new BadRequestException('Order not in WAITING_SELLER status');
+    }
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { buyerInfo },
+    });
     return { success: true };
   }
 

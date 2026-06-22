@@ -293,7 +293,30 @@ export class StockService {
       data.hasSubAccounts = dto.hasSubAccounts;
     }
 
+    const oldStatus = account.status;
     const updated = await this.prisma.account.update({ where: { id }, data });
+
+    // If old status was NEEDS_REPAIR or EXPIRED and credentials were changed, set back to AVAILABLE
+    if ((oldStatus === 'NEEDS_REPAIR' || oldStatus === 'EXPIRED') && (dto.email || dto.password)) {
+      await this.prisma.account.update({ where: { id }, data: { status: 'AVAILABLE' } });
+      // Detach any expired orders from this stock
+      const attachedOrders = await this.prisma.order.findMany({
+        where: {
+          status: 'FULFILLED',
+          OR: [{ accountId: id }, { subAccount: { accountId: id } }],
+          accessExpiresAt: { lte: new Date() },
+        },
+      });
+      for (const order of attachedOrders) {
+        if (order.subAccountId) {
+          await this.prisma.subAccount.update({ where: { id: order.subAccountId }, data: { status: 'AVAILABLE' } });
+        }
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { subAccountId: null, accountId: null },
+        });
+      }
+    }
 
     // Notify active (non-expired) buyers with full credential details
     try {
@@ -423,7 +446,23 @@ export class StockService {
       data.pinTag = enc.authTag;
     }
 
+    const oldSubStatus = subAccount.status;
     const updated = await this.prisma.subAccount.update({ where: { id }, data });
+
+    // If old status was NEEDS_REPAIR or EXPIRED and credentials were changed, set back to AVAILABLE
+    if ((oldSubStatus === 'NEEDS_REPAIR' || oldSubStatus === 'EXPIRED') && (dto.name || dto.pin)) {
+      await this.prisma.subAccount.update({ where: { id }, data: { status: 'AVAILABLE' } });
+      // Detach any expired orders from this sub-account
+      const attachedOrder = await this.prisma.order.findFirst({
+        where: { subAccountId: id, status: 'FULFILLED', accessExpiresAt: { lte: new Date() } },
+      });
+      if (attachedOrder) {
+        await this.prisma.order.update({
+          where: { id: attachedOrder.id },
+          data: { subAccountId: null },
+        });
+      }
+    }
 
     // Notify active (non-expired) buyer with full credential details
     try {

@@ -11,8 +11,13 @@ export class OrderExpiryProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ orderId: string }>) {
-    this.logger.log(`Expiring order ${job.data.orderId}`);
-    await this.orderService.expireOrder(job.data.orderId);
+  async process(job: Job<{ orderId?: string }>) {
+    if (job.name === 'scan-access-expiry') {
+      this.logger.log('Scanning for expired access stock');
+      await this.orderService.expireAccessStock();
+    } else {
+      this.logger.log(`Expiring order ${job.data.orderId}`);
+      await this.orderService.expireOrder(job.data.orderId!);
+    }
   }
 }

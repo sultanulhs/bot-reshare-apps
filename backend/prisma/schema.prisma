@@ -25,6 +25,8 @@ enum StockStatus {
   AVAILABLE
   LOCKED
   SOLD
+  NEEDS_REPAIR
+  EXPIRED
 }
 
 enum ProductType {

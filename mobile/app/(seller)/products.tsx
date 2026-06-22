@@ -33,6 +33,7 @@ interface App {
   pendingWarrantyCount?: number;
   loginReportCount?: number;
   totalLoginReportCount?: number;
+  needsRepairCount?: number;
 }
 
 export default function ProductsScreen() {
@@ -245,10 +246,12 @@ export default function ProductsScreen() {
           const pendingWarrantyCount = item.pendingWarrantyCount ?? 0;
           const loginReportCount = item.loginReportCount ?? 0;
           const totalLoginReportCount = item.totalLoginReportCount ?? 0;
+          const needsRepairCount = item.needsRepairCount ?? 0;
           const cardBorderStyle = {
             ...(expiredCount > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
             ...(pendingWarrantyCount > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
             ...(loginReportCount > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
+            ...(needsRepairCount > 0 ? { borderTopWidth: 3, borderTopColor: '#f97316' } : {}),
           };
           return (
             <TouchableOpacity
@@ -284,8 +287,8 @@ export default function ProductsScreen() {
               {loginReportCount > 0 && (
                 <Text style={styles.loginReportBadge}>{loginReportCount} laporan login</Text>
               )}
-              {loginReportCount === 0 && totalLoginReportCount > 0 && (
-                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F4CB}'} Riwayat Laporan</Text>
+              {needsRepairCount > 0 && (
+                <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F527}'} {needsRepairCount} perlu diperbaiki</Text>
               )}
             </TouchableOpacity>
           );

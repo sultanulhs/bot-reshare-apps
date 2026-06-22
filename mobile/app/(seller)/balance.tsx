@@ -221,14 +221,20 @@ export default function BalanceScreen() {
               {item.accessExpiresAt && item.status === 'FULFILLED' && (
                 <Text style={styles.cardDate}>⏰ Berlaku s/d: {fmtDate(item.accessExpiresAt)}</Text>
               )}
-              {item.warrantyStatus && (
+              {item.warrantyStatus && item.warrantyStatus === 'ACTIVE' ? (
+                <TouchableOpacity onPress={() => openPhotoHistory(item.orderId)}>
+                  <Text style={{ fontSize: 11, marginTop: 2, fontWeight: '600', color: '#16a34a' }}>
+                    {'\u{1F6E1}\u{FE0F}'} Garansi Aktif {'\u{1F4F7}'}
+                  </Text>
+                </TouchableOpacity>
+              ) : item.warrantyStatus ? (
                 <Text style={{
                   fontSize: 11, marginTop: 2, fontWeight: '600',
-                  color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                  color: item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                 }}>
-                  {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu' : '\u{274C} Garansi Hangus'}
+                  {item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu' : '\u{274C} Garansi Hangus'}
                 </Text>
-              )}
+              ) : null}
               {item.warrantyStatus === 'SUBMITTED' && (
                 <>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
@@ -244,19 +250,21 @@ export default function BalanceScreen() {
                     </TouchableOpacity>
                   </View>
                   <TouchableOpacity onPress={() => openPhotoHistory(item.orderId)} style={{ marginTop: 4 }}>
-                    <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Riwayat Foto</Text>
+                    <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4F7}'} Foto Garansi</Text>
                   </TouchableOpacity>
                 </>
-              )}
-              {item.warrantyStatus && item.warrantyStatus !== 'SUBMITTED' && item.warrantyStatus !== 'PENDING' && (
-                <TouchableOpacity onPress={() => openPhotoHistory(item.orderId)} style={{ marginTop: 2 }}>
-                  <Text style={{ color: '#2563eb', fontSize: 11 }}>{'\u{1F4F7}'} Riwayat Foto</Text>
-                </TouchableOpacity>
               )}
               {(item.loginReportCount ?? 0) > 0 && (
                 <TouchableOpacity onPress={() => openLoginReports(item.orderId)}>
                   <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
                     {'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && (
+                <TouchableOpacity onPress={() => openLoginReports(item.orderId)}>
+                  <Text style={{ color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                    {'\u{2705}'} Komplain Selesai
                   </Text>
                 </TouchableOpacity>
               )}

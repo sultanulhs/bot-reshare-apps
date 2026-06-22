@@ -225,7 +225,8 @@ export default function SubAccountsScreen() {
     ]);
   };
 
-  const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : '#f59e0b';
+  const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : s === 'NEEDS_REPAIR' ? '#f97316' : s === 'EXPIRED' ? '#ef4444' : '#f59e0b';
+  const statusLabel = (s: string) => s === 'NEEDS_REPAIR' ? '\u{1F527} Perlu Diperbaiki' : s === 'EXPIRED' ? '\u{231B} Kadaluarsa' : s;
 
   return (
     <View style={styles.container}>
@@ -254,6 +255,9 @@ export default function SubAccountsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName}>{item.name}</Text>
                 <Text style={styles.cardPin}>PIN: {item.pin}</Text>
+                {(item.status === 'NEEDS_REPAIR' || item.status === 'EXPIRED') && (
+                  <Text style={{ fontSize: 11, color: '#f97316', marginTop: 4 }}>Edit kredensial untuk mengaktifkan kembali</Text>
+                )}
                 {item.buyerTgUserId && (item.status === 'SOLD' || item.status === 'LOCKED') && (
                   <Text style={item.isExpired ? styles.buyerExpired : item.status === 'LOCKED' ? styles.buyerLocked : styles.buyerActive}>
                     {item.status === 'LOCKED' ? '🔒 Menunggu Bayar' : item.isExpired ? '⚠️ Kadaluarsa' : '👤 Aktif'} — Pembeli: {
@@ -273,17 +277,26 @@ export default function SubAccountsScreen() {
                     Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                   </Text>
                 )}
-                {item.warrantyStatus && (
+                {item.warrantyStatus && item.warrantyStatus === 'ACTIVE' && item.orderId ? (
+                  <TouchableOpacity onPress={() => openPhotoHistory(item.orderId!)}>
+                    <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#16a34a' }}>
+                      {'\u{1F6E1}\u{FE0F}'} Garansi Aktif {'\u{1F4F7}'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : item.warrantyStatus && item.warrantyStatus === 'SUBMITTED' && item.orderId ? (
+                  <TouchableOpacity onPress={() => openPhotoHistory(item.orderId!)}>
+                    <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#3b82f6' }}>
+                      {'\u{1F4F8}'} Menunggu Verifikasi {'\u{1F4F7}'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : item.warrantyStatus ? (
                   <Text style={{
                     fontSize: 12, marginTop: 4, fontWeight: '600',
-                    color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                    color: item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                   }}>
-                    {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                    {item.orderId && (
-                      <Text onPress={() => openPhotoHistory(item.orderId!)} style={{ color: '#2563eb' }}> {'\u{1F4F7}'} Riwayat</Text>
-                    )}
+                    {item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
                   </Text>
-                )}
+                ) : null}
                 {item.warrantyStatus === 'SUBMITTED' && item.orderId && (
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                     <TouchableOpacity
@@ -307,14 +320,14 @@ export default function SubAccountsScreen() {
                 )}
                 {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && item.orderId && (
                   <TouchableOpacity onPress={() => openLoginReports(item.orderId!)}>
-                    <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
-                      {'\u{1F4CB}'} Riwayat Laporan
+                    <Text style={{ color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                      {'\u{2705}'} Komplain Selesai
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
               <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
-                <Text style={styles.badgeText}>{item.status}</Text>
+                <Text style={styles.badgeText}>{statusLabel(item.status)}</Text>
               </View>
             </View>
             <View style={styles.cardFooter}>

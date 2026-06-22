@@ -13,6 +13,8 @@ const pendingManualOrders = new Map<string, { durationId: string; sellerId: stri
 const pendingWarrantyPhotos = new Map<string, string>(); // tgUserId -> orderId
 // In-memory state for login report photo uploads
 const pendingLoginReports = new Map<string, string>(); // tgUserId -> orderId
+// In-memory state for manual order re-info (after account replacement)
+const pendingManualReinfo = new Map<string, string>(); // tgUserId -> orderId
 
 export function createBuyerComposer(
   prisma: PrismaService,
@@ -451,23 +453,28 @@ export function createBuyerComposer(
     );
   });
 
-  // Warranty — list pending warranty orders
+  // Warranty — list all active orders (for warranty & complaints)
   composer.callbackQuery('warranty', async (ctx) => {
     await ctx.answerCallbackQuery();
     const tgUserId = BigInt(ctx.from.id);
     const orders = await prisma.order.findMany({
-      where: { buyerTgUserId: tgUserId, warrantyStatus: { in: ['PENDING', 'SUBMITTED'] } },
+      where: {
+        buyerTgUserId: tgUserId,
+        status: 'FULFILLED',
+        OR: [{ accessExpiresAt: null }, { accessExpiresAt: { gt: new Date() } }],
+      },
       include: { duration: { include: { app: { include: { template: true } } } } },
+      orderBy: { createdAt: 'desc' },
     });
     if (orders.length === 0) {
-      await ctx.reply('\u{2705} Tidak ada pesanan yang memerlukan aksi garansi atau komplain.');
+      await ctx.reply('\u{2705} Tidak ada pesanan aktif.');
       return;
     }
     const keyboard = new InlineKeyboard();
     for (const o of orders) {
       const name = o.duration?.app?.template?.name ?? 'Pesanan';
       const label = o.duration?.label ?? '';
-      const statusTag = o.warrantyStatus === 'SUBMITTED' ? ' \u{23F3}' : '';
+      const statusTag = o.warrantyStatus === 'ACTIVE' ? ' \u{2705}' : o.warrantyStatus === 'SUBMITTED' ? ' \u{23F3}' : '';
       keyboard.text(`\u{1F4F1} ${name}${label ? ` (${label})` : ''}${statusTag}`, `warranty_select_${o.id}`).row();
     }
     await ctx.reply('\u{1F6E1}\u{FE0F} *Garansi & Komplain*\n\nPilih produk yang dibeli:', {
@@ -489,12 +496,23 @@ export function createBuyerComposer(
     const label = order.duration?.label ?? '';
     const keyboard = new InlineKeyboard();
 
-    if (order.warrantyStatus === 'SUBMITTED') {
+    if (order.warrantyStatus === 'ACTIVE') {
+      keyboard
+        .text('\u{2705} Garansi Sudah Aktif', 'warranty_done').row()
+        .text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`);
+      await ctx.reply(
+        `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\n\u{2705} Garansi sudah diaktivasi.\n\nJika ada masalah, kirim komplain:`,
+        { parse_mode: 'Markdown', reply_markup: keyboard },
+      );
+    } else if (order.warrantyStatus === 'SUBMITTED') {
+      keyboard
+        .text('\u{23F3} Menunggu Verifikasi', 'warranty_done').row()
+        .text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`);
       await ctx.reply(
         `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\n\u{23F3} Foto garansi sudah dikirim, menunggu verifikasi penjual.\n\nJika ada masalah lain, kirim komplain:`,
-        { parse_mode: 'Markdown', reply_markup: keyboard.text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`) },
+        { parse_mode: 'Markdown', reply_markup: keyboard },
       );
-    } else {
+    } else if (order.warrantyStatus === 'PENDING') {
       keyboard
         .text('\u{1F4F8} Aktivasi Garansi', `warranty_${orderId}`).row()
         .text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`);
@@ -502,7 +520,19 @@ export function createBuyerComposer(
         `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\nPilih aksi:`,
         { parse_mode: 'Markdown', reply_markup: keyboard },
       );
+    } else {
+      // No warranty (null) — only complaint option
+      keyboard.text('\u{274C} Komplain / Tidak Bisa Login', `loginreport_${orderId}`);
+      await ctx.reply(
+        `\u{1F4F1} *${name}${label ? ` (${label})` : ''}*\n\nKirim komplain jika ada masalah:`,
+        { parse_mode: 'Markdown', reply_markup: keyboard },
+      );
     }
+  });
+
+  // Warranty done — no-op handler for inert buttons
+  composer.callbackQuery('warranty_done', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: '\u{2705} Garansi sudah diaktivasi', show_alert: true });
   });
 
   // Login report — select order and prompt for screenshot
@@ -561,9 +591,32 @@ export function createBuyerComposer(
     }
   });
 
+  // Manual re-info callback — buyer sends new info after account replacement
+  composer.callbackQuery(/^manual_reinfo_(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const orderId = ctx.match![1];
+    pendingManualReinfo.set(ctx.from.id.toString(), orderId);
+    await ctx.reply('\u{1F4DD} Kirim info baru kamu sekarang.', { parse_mode: 'Markdown' });
+  });
+
   // Handle text replies for MANUAL orders (buyer info input)
   composer.on('message:text', async (ctx) => {
     const tgUserId = ctx.from.id.toString();
+
+    // Check for manual re-info (account replacement flow) first
+    const reinfoOrderId = pendingManualReinfo.get(tgUserId);
+    if (reinfoOrderId) {
+      pendingManualReinfo.delete(tgUserId);
+      const newBuyerInfo = ctx.message.text;
+      try {
+        await orderService.updateManualBuyerInfo(reinfoOrderId, newBuyerInfo);
+        await ctx.reply('\u{2705} Info diterima, menunggu penjual memproses.');
+      } catch (err: any) {
+        await ctx.reply(`\u{274C} Gagal mengirim info: ${err.message}`);
+      }
+      return;
+    }
+
     const pending = pendingManualOrders.get(tgUserId);
     if (!pending) return;
 

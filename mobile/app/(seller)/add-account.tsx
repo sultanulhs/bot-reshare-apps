@@ -262,7 +262,8 @@ export default function AddAccountScreen() {
     ]);
   };
 
-  const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : '#f59e0b';
+  const statusColor = (s: string) => s === 'AVAILABLE' ? '#16a34a' : s === 'SOLD' ? '#ef4444' : s === 'NEEDS_REPAIR' ? '#f97316' : s === 'EXPIRED' ? '#ef4444' : '#f59e0b';
+  const statusLabel = (s: string) => s === 'NEEDS_REPAIR' ? '\u{1F527} Perlu Diperbaiki' : s === 'EXPIRED' ? '\u{231B} Kadaluarsa' : s;
 
   return (
     <View style={styles.container}>
@@ -307,9 +308,13 @@ export default function AddAccountScreen() {
                 <Text style={styles.cardPass}>{item.password}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
-                <Text style={styles.badgeText}>{item.status}</Text>
+                <Text style={styles.badgeText}>{statusLabel(item.status)}</Text>
               </View>
             </View>
+            {/* Info for NEEDS_REPAIR / EXPIRED accounts */}
+            {(item.status === 'NEEDS_REPAIR' || item.status === 'EXPIRED') && (
+              <Text style={{ fontSize: 11, color: '#f97316', marginTop: 4 }}>Edit kredensial untuk mengaktifkan kembali</Text>
+            )}
             {/* Buyer info for accounts without sub-accounts */}
             {item.buyerTgUserId && (item.subAvailable + item.subLocked + item.subSold === 0) && (item.status === 'SOLD' || item.status === 'LOCKED') && (
               <Text style={item.isExpired ? styles.buyerExpired : item.status === 'LOCKED' ? styles.buyerLocked : styles.buyerActive}>
@@ -324,17 +329,26 @@ export default function AddAccountScreen() {
             {item.accessExpiresAt && item.status === 'SOLD' && (item.subAvailable + item.subLocked + item.subSold === 0) && (
               <Text style={styles.expiryDate}>Berlaku sampai: {new Date(item.accessExpiresAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</Text>
             )}
-            {item.warrantyStatus && (
+            {item.warrantyStatus && item.warrantyStatus === 'ACTIVE' && item.orderId ? (
+              <TouchableOpacity onPress={() => openPhotoHistory(item.orderId!)}>
+                <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#16a34a' }}>
+                  {'\u{1F6E1}\u{FE0F}'} Garansi Aktif {'\u{1F4F7}'}
+                </Text>
+              </TouchableOpacity>
+            ) : item.warrantyStatus && item.warrantyStatus === 'SUBMITTED' && item.orderId ? (
+              <TouchableOpacity onPress={() => openPhotoHistory(item.orderId!)}>
+                <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#3b82f6' }}>
+                  {'\u{1F4F8}'} Menunggu Verifikasi {'\u{1F4F7}'}
+                </Text>
+              </TouchableOpacity>
+            ) : item.warrantyStatus ? (
               <Text style={{
                 fontSize: 12, marginTop: 4, fontWeight: '600',
-                color: item.warrantyStatus === 'ACTIVE' ? '#16a34a' : item.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                color: item.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
               }}>
-                {item.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : item.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                {item.orderId && (
-                  <Text onPress={() => openPhotoHistory(item.orderId!)} style={{ color: '#2563eb' }}> {'\u{1F4F7}'} Riwayat</Text>
-                )}
+                {item.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
               </Text>
-            )}
+            ) : null}
             {item.warrantyStatus === 'SUBMITTED' && item.orderId && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                 <TouchableOpacity
@@ -363,11 +377,9 @@ export default function AddAccountScreen() {
                 <Text style={styles.loginReportBadge}>{'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login</Text>
               </TouchableOpacity>
             )}
-            {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && (
-              <TouchableOpacity onPress={() => {
-                if (!item.hasSubAccounts && item.orderId) openLoginReports(item.orderId);
-              }}>
-                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F4CB}'} Riwayat Laporan</Text>
+            {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && !item.hasSubAccounts && item.orderId && (
+              <TouchableOpacity onPress={() => openLoginReports(item.orderId!)}>
+                <Text style={{ color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{2705}'} Komplain Selesai</Text>
               </TouchableOpacity>
             )}
             <View style={styles.cardFooter}>
@@ -487,15 +499,26 @@ export default function AddAccountScreen() {
                       )}
                     </>
                   )}
-                  {order.warrantyStatus && (
+                  {order.warrantyStatus && order.warrantyStatus === 'ACTIVE' ? (
+                    <TouchableOpacity onPress={() => openPhotoHistory(order.id)}>
+                      <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#16a34a' }}>
+                        {'\u{1F6E1}\u{FE0F}'} Garansi Aktif {'\u{1F4F7}'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : order.warrantyStatus && order.warrantyStatus === 'SUBMITTED' ? (
+                    <TouchableOpacity onPress={() => openPhotoHistory(order.id)}>
+                      <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#3b82f6' }}>
+                        {'\u{1F4F8}'} Menunggu Verifikasi {'\u{1F4F7}'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : order.warrantyStatus ? (
                     <Text style={{
                       fontSize: 12, marginTop: 4, fontWeight: '600',
-                      color: order.warrantyStatus === 'ACTIVE' ? '#16a34a' : order.warrantyStatus === 'SUBMITTED' ? '#3b82f6' : order.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
+                      color: order.warrantyStatus === 'PENDING' ? '#f59e0b' : '#ef4444',
                     }}>
-                      {order.warrantyStatus === 'ACTIVE' ? '\u{1F6E1}\u{FE0F} Garansi Aktif' : order.warrantyStatus === 'SUBMITTED' ? '\u{1F4F8} Menunggu Verifikasi' : order.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
-                      <Text onPress={() => openPhotoHistory(order.id)} style={{ color: '#2563eb' }}> {'\u{1F4F7}'} Riwayat</Text>
+                      {order.warrantyStatus === 'PENDING' ? '\u{23F3} Garansi Menunggu Foto' : '\u{274C} Garansi Hangus'}
                     </Text>
-                  )}
+                  ) : null}
                   {order.warrantyStatus === 'SUBMITTED' && (
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                       <TouchableOpacity
@@ -519,8 +542,8 @@ export default function AddAccountScreen() {
                   )}
                   {(order.loginReportCount ?? 0) === 0 && (order.totalLoginReportCount ?? 0) > 0 && (
                     <TouchableOpacity onPress={() => openLoginReports(order.id)}>
-                      <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
-                        {'\u{1F4CB}'} Riwayat Laporan
+                      <Text style={{ color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                        {'\u{2705}'} Komplain Selesai
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -697,7 +720,16 @@ export default function AddAccountScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={{ backgroundColor: '#2563eb', borderRadius: 6, padding: 6, alignItems: 'center', flex: 1 }}
-                        onPress={() => openReplacements(loginReportOrderId!)}>
+                        onPress={() => {
+                          if (isManual) {
+                            Alert.alert('Ganti Akun', 'Yakin ingin mengganti akun? Pembeli akan diminta kirim info baru.', [
+                              { text: 'Batal', style: 'cancel' },
+                              { text: 'Ganti', onPress: () => replaceStock.mutate({ orderId: loginReportOrderId!, stockId: '', stockType: 'manual' }) },
+                            ]);
+                          } else {
+                            openReplacements(loginReportOrderId!);
+                          }
+                        }}>
                         <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{'\u{1F504}'} Ganti Akun</Text>
                       </TouchableOpacity>
                     </View>

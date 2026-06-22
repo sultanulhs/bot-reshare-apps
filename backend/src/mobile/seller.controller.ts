@@ -382,7 +382,13 @@ export class SellerController {
 
   @Post('orders/:id/replace-stock')
   @UseGuards(ActiveSellerGuard)
-  async replaceStock(@Req() req: any, @Param('id') id: string, @Body() body: { stockId: string; stockType: 'subAccount' | 'account' }) {
+  async replaceStock(@Req() req: any, @Param('id') id: string, @Body() body: { stockId?: string; stockType?: 'subAccount' | 'account' | 'manual' }) {
+    if (body.stockType === 'manual') {
+      return this.orderService.replaceManualOrder(req.seller.id, id);
+    }
+    if (!body.stockId || !body.stockType) {
+      throw new BadRequestException('stockId and stockType are required');
+    }
     return this.orderService.replaceOrderStock(req.seller.id, id, body.stockId, body.stockType);
   }
 
