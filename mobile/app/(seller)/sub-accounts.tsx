@@ -81,7 +81,7 @@ export default function SubAccountsScreen() {
     try {
       const res = await api.get(`/seller/orders/${orderId}/login-reports`);
       setLoginReports(res.data);
-    } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
+    } catch { Alert.alert('Error', 'Gagal memuat komplain'); }
   };
 
   const viewLoginReportPhoto = async (photoId: string) => {
@@ -168,7 +168,7 @@ export default function SubAccountsScreen() {
       setResolveReportId(null);
       setResolveNote('');
       if (loginReportOrderId) openLoginReports(loginReportOrderId);
-      Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+      Alert.alert('Berhasil', 'Komplain berhasil diselesaikan');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -314,7 +314,7 @@ export default function SubAccountsScreen() {
                 {(item.loginReportCount ?? 0) > 0 && item.orderId && (
                   <TouchableOpacity onPress={() => openLoginReports(item.orderId!)}>
                     <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
-                      {'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login
+                      {'\u{26A0}\u{FE0F}'} {item.loginReportCount} komplain
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -462,7 +462,7 @@ export default function SubAccountsScreen() {
       <Modal visible={!!loginReportOrderId} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-            <Text style={styles.modalTitle}>Laporan Login</Text>
+            <Text style={styles.modalTitle}>Komplain</Text>
             <FlatList
               data={loginReports}
               keyExtractor={(item) => item.id}
@@ -557,7 +557,7 @@ export default function SubAccountsScreen() {
       <Modal visible={!!resolveReportId} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selesaikan Laporan</Text>
+            <Text style={styles.modalTitle}>Selesaikan Komplain</Text>
             <TextInput
               style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
               placeholder="Catatan penyelesaian (opsional)"

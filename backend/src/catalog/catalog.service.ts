@@ -139,6 +139,9 @@ export class CatalogService {
         const needsRepairCount =
           (await this.prisma.subAccount.count({ where: { status: 'NEEDS_REPAIR', deletedAt: null, account: appDurationFilter } })) +
           (await this.prisma.account.count({ where: { status: 'NEEDS_REPAIR', ...noSubFilter } }));
+        const waitingSellerCount = await this.prisma.order.count({
+          where: { status: 'WAITING_SELLER', duration: { appId: app.id, deletedAt: null } },
+        });
         return {
           id: app.id,
           templateId: app.templateId,
@@ -156,6 +159,7 @@ export class CatalogService {
           loginReportCount,
           totalLoginReportCount,
           needsRepairCount,
+          waitingSellerCount,
         };
       }),
     );
@@ -409,6 +413,9 @@ export class CatalogService {
         const needsRepairCount =
           (await this.prisma.subAccount.count({ where: { status: 'NEEDS_REPAIR', deletedAt: null, account: durFilterRepair } })) +
           (await this.prisma.account.count({ where: { status: 'NEEDS_REPAIR', ...noSubDurFilterRepair } }));
+        const waitingSellerCount = await this.prisma.order.count({
+          where: { status: 'WAITING_SELLER', durationId: d.id },
+        });
         return {
           id: d.id,
           label: d.label,
@@ -426,6 +433,7 @@ export class CatalogService {
           loginReportCount,
           totalLoginReportCount,
           needsRepairCount,
+          waitingSellerCount,
         };
       }),
     );

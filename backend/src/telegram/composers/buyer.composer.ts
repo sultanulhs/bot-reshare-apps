@@ -606,10 +606,10 @@ export function createBuyerComposer(
     // Check for manual re-info (account replacement flow) first
     const reinfoOrderId = pendingManualReinfo.get(tgUserId);
     if (reinfoOrderId) {
-      pendingManualReinfo.delete(tgUserId);
       const newBuyerInfo = ctx.message.text;
       try {
         await orderService.updateManualBuyerInfo(reinfoOrderId, newBuyerInfo);
+        pendingManualReinfo.delete(tgUserId);
         await ctx.reply('\u{2705} Info diterima, menunggu penjual memproses.');
       } catch (err: any) {
         await ctx.reply(`\u{274C} Gagal mengirim info: ${err.message}`);

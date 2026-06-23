@@ -87,6 +87,11 @@ export default function AddAccountScreen() {
   const [resolveNote, setResolveNote] = useState('');
   const [replaceOrderId, setReplaceOrderId] = useState<string | null>(null);
   const [replacements, setReplacements] = useState<any[]>([]);
+  const [buyerInfoHistoryOrderId, setBuyerInfoHistoryOrderId] = useState<string | null>(null);
+  const [buyerInfoHistory, setBuyerInfoHistory] = useState<Array<{ info: string; createdAt: string }>>([]);
+  const [loadingBuyerInfoHistory, setLoadingBuyerInfoHistory] = useState(false);
+  const [fulfillOrderId, setFulfillOrderId] = useState<string | null>(null);
+  const [fulfillCredentials, setFulfillCredentials] = useState('');
 
   const viewWarrantyPhoto = async (photoId: string) => {
     try {
@@ -110,7 +115,7 @@ export default function AddAccountScreen() {
     try {
       const res = await api.get(`/seller/orders/${orderId}/login-reports`);
       setLoginReports(res.data);
-    } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
+    } catch { Alert.alert('Error', 'Gagal memuat komplain'); }
   };
 
   const viewLoginReportPhoto = async (photoId: string) => {
@@ -126,6 +131,16 @@ export default function AddAccountScreen() {
       setReplacements(res.data);
       setReplaceOrderId(orderId);
     } catch { Alert.alert('Error', 'Gagal memuat stok pengganti'); }
+  };
+
+  const openBuyerInfoHistory = async (orderId: string) => {
+    setBuyerInfoHistoryOrderId(orderId);
+    setLoadingBuyerInfoHistory(true);
+    try {
+      const res = await api.get(`/seller/orders/${orderId}/buyer-info-history`);
+      setBuyerInfoHistory(res.data);
+    } catch { Alert.alert('Error', 'Gagal memuat riwayat info'); }
+    setLoadingBuyerInfoHistory(false);
   };
 
   const { data: accountData, isLoading, refetch } = useQuery<{ accounts: Account[]; manualOrders: ManualOrder[] }>({
@@ -205,6 +220,18 @@ export default function AddAccountScreen() {
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
 
+  const fulfillOrder = useMutation({
+    mutationFn: ({ orderId, credentials }: { orderId: string; credentials: string }) =>
+      api.post(`/seller/orders/${orderId}/fulfill`, { credentials }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seller-accounts', durationId] });
+      setFulfillOrderId(null);
+      setFulfillCredentials('');
+      Alert.alert('Berhasil', 'Kredensial berhasil dikirim ke pembeli');
+    },
+    onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
+  });
+
   const resolveReport = useMutation({
     mutationFn: ({ id, note }: { id: string; note: string }) =>
       api.post(`/seller/login-reports/${id}/resolve`, { note }),
@@ -213,7 +240,7 @@ export default function AddAccountScreen() {
       setResolveReportId(null);
       setResolveNote('');
       if (loginReportOrderId) openLoginReports(loginReportOrderId);
-      Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+      Alert.alert('Berhasil', 'Komplain berhasil diselesaikan');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -374,7 +401,7 @@ export default function AddAccountScreen() {
                 // For accounts without sub-accounts, open login reports directly
                 if (!item.hasSubAccounts && item.orderId) openLoginReports(item.orderId);
               }}>
-                <Text style={styles.loginReportBadge}>{'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan login</Text>
+                <Text style={styles.loginReportBadge}>{'\u{26A0}\u{FE0F}'} {item.loginReportCount} komplain</Text>
               </TouchableOpacity>
             )}
             {(item.loginReportCount ?? 0) === 0 && (item.totalLoginReportCount ?? 0) > 0 && !item.hasSubAccounts && item.orderId && (
@@ -499,6 +526,13 @@ export default function AddAccountScreen() {
                       )}
                     </>
                   )}
+                  {order.status === 'WAITING_SELLER' && (
+                    <TouchableOpacity
+                      style={{ marginTop: 8, backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}
+                      onPress={() => setFulfillOrderId(order.id)}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{'\u{26A1}'} Proses</Text>
+                    </TouchableOpacity>
+                  )}
                   {order.warrantyStatus && order.warrantyStatus === 'ACTIVE' ? (
                     <TouchableOpacity onPress={() => openPhotoHistory(order.id)}>
                       <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '600', color: '#16a34a' }}>
@@ -536,7 +570,7 @@ export default function AddAccountScreen() {
                   {(order.loginReportCount ?? 0) > 0 && (
                     <TouchableOpacity onPress={() => openLoginReports(order.id)}>
                       <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
-                        {'\u{26A0}\u{FE0F}'} {order.loginReportCount} laporan login
+                        {'\u{26A0}\u{FE0F}'} {order.loginReportCount} komplain
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -545,6 +579,13 @@ export default function AddAccountScreen() {
                       <Text style={{ color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
                         {'\u{2705}'} Komplain Selesai
                       </Text>
+                    </TouchableOpacity>
+                  )}
+                  {order.fulfilledAt && (
+                    <TouchableOpacity
+                      style={{ marginTop: 6, backgroundColor: '#f0f9ff', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 10, alignSelf: 'flex-start' }}
+                      onPress={() => openBuyerInfoHistory(order.id)}>
+                      <Text style={{ color: '#2563eb', fontSize: 12, fontWeight: '600' }}>{'\u{1F4CB}'} Riwayat Info</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -675,7 +716,7 @@ export default function AddAccountScreen() {
       <Modal visible={!!loginReportOrderId} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-            <Text style={styles.modalTitle}>Laporan Login</Text>
+            <Text style={styles.modalTitle}>Komplain</Text>
             <FlatList
               data={loginReports}
               keyExtractor={(item) => item.id}
@@ -779,7 +820,7 @@ export default function AddAccountScreen() {
       <Modal visible={!!resolveReportId} animationType="slide" transparent>
         <View style={styles.modal}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selesaikan Laporan</Text>
+            <Text style={styles.modalTitle}>Selesaikan Komplain</Text>
             <TextInput
               style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
               placeholder="Catatan penyelesaian (opsional)"
@@ -796,6 +837,92 @@ export default function AddAccountScreen() {
             <TouchableOpacity onPress={() => { setResolveReportId(null); setResolveNote(''); }}>
               <Text style={styles.cancel}>Batal</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Buyer Info History Modal */}
+      <Modal visible={!!buyerInfoHistoryOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Riwayat Info Pembeli</Text>
+            {loadingBuyerInfoHistory ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Memuat...</Text>
+            ) : buyerInfoHistory.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#999', marginVertical: 16 }}>Belum ada riwayat info</Text>
+            ) : (
+              <FlatList
+                data={buyerInfoHistory}
+                keyExtractor={(_, i) => i.toString()}
+                renderItem={({ item, index }) => (
+                  <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: index === buyerInfoHistory.length - 1 ? '#2563eb' : '#d1d5db', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{index + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{item.info}</Text>
+                        <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                          {new Date(item.createdAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={() => { Clipboard.setString(item.info); Alert.alert('Tersalin', 'Info telah disalin'); }}>
+                        <Text style={{ fontSize: 16 }}>{'\u{1F4CB}'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              />
+            )}
+            <TouchableOpacity onPress={() => { setBuyerInfoHistoryOrderId(null); setBuyerInfoHistory([]); }}>
+              <Text style={[styles.cancel, { marginTop: 16 }]}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Fulfill Manual Order Modal */}
+      <Modal visible={!!fulfillOrderId} animationType="slide" transparent>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Proses Pesanan Manual</Text>
+            {fulfillOrderId && (() => {
+              const order = manualOrders.find(o => o.id === fulfillOrderId);
+              return order?.buyerInfo ? (
+                <View style={{ backgroundColor: '#f0f9ff', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Info Pembeli:</Text>
+                  <Text selectable style={{ fontSize: 14, color: '#333' }}>{order.buyerInfo}</Text>
+                  <TouchableOpacity onPress={() => { Clipboard.setString(order.buyerInfo!); Alert.alert('Tersalin'); }} style={{ marginTop: 4 }}>
+                    <Text style={{ color: '#2563eb', fontSize: 12 }}>{'\u{1F4CB}'} Salin</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null;
+            })()}
+            <TextInput
+              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+              placeholder="Masukkan kredensial untuk pembeli"
+              value={fulfillCredentials}
+              onChangeText={setFulfillCredentials}
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <TouchableOpacity
+                style={[styles.button, { flex: 1, backgroundColor: '#16a34a' }]}
+                onPress={() => {
+                  if (!fulfillCredentials.trim()) { Alert.alert('Error', 'Kredensial tidak boleh kosong'); return; }
+                  fulfillOrder.mutate({ orderId: fulfillOrderId!, credentials: fulfillCredentials.trim() });
+                }}
+                disabled={fulfillOrder.isPending}
+              >
+                <Text style={styles.buttonText}>{fulfillOrder.isPending ? 'Mengirim...' : 'Kirim Kredensial'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { flex: 1, backgroundColor: '#6b7280' }]}
+                onPress={() => { setFulfillOrderId(null); setFulfillCredentials(''); }}
+              >
+                <Text style={styles.buttonText}>Batal</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

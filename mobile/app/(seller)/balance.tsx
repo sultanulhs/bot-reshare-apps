@@ -76,7 +76,7 @@ export default function BalanceScreen() {
     try {
       const res = await api.get(`/seller/orders/${orderId}/login-reports`);
       setLoginReports(res.data);
-    } catch { Alert.alert('Error', 'Gagal memuat laporan'); }
+    } catch { Alert.alert('Error', 'Gagal memuat komplain'); }
   };
 
   const viewLoginReportPhoto = async (photoId: string) => {
@@ -102,7 +102,7 @@ export default function BalanceScreen() {
       setResolveReportId(null);
       setResolveNote('');
       if (loginReportOrderId) openLoginReports(loginReportOrderId);
-      Alert.alert('Berhasil', 'Laporan berhasil diselesaikan');
+      Alert.alert('Berhasil', 'Komplain berhasil diselesaikan');
     },
     onError: (err: any) => Alert.alert('Gagal', err.response?.data?.message || 'Error'),
   });
@@ -257,7 +257,7 @@ export default function BalanceScreen() {
               {(item.loginReportCount ?? 0) > 0 && (
                 <TouchableOpacity onPress={() => openLoginReports(item.orderId)}>
                   <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>
-                    {'\u{26A0}\u{FE0F}'} {item.loginReportCount} laporan
+                    {'\u{26A0}\u{FE0F}'} {item.loginReportCount} komplain
                   </Text>
                 </TouchableOpacity>
               )}
@@ -338,7 +338,7 @@ export default function BalanceScreen() {
       <Modal visible={!!loginReportOrderId} animationType="slide" transparent>
         <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24, maxHeight: '80%' }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Laporan Login</Text>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Komplain</Text>
             <FlatList
               data={loginReports}
               keyExtractor={(item) => item.id}
@@ -433,7 +433,7 @@ export default function BalanceScreen() {
       <Modal visible={!!resolveReportId} animationType="slide" transparent>
         <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ margin: 24, backgroundColor: '#fff', borderRadius: 12, padding: 24 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Selesaikan Laporan</Text>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Selesaikan Komplain</Text>
             <TextInput
               style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12, minHeight: 80, textAlignVertical: 'top' }}
               placeholder="Catatan penyelesaian (opsional)"

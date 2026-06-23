@@ -153,6 +153,13 @@ export class OrderService implements OnModuleInit {
         },
       });
 
+      // Save initial buyerInfo as OrderMessage for history tracking
+      if (params.buyerInfo) {
+        await tx.orderMessage.create({
+          data: { orderId: order.id, message: `[INFO_PEMBELI] ${params.buyerInfo}` },
+        });
+      }
+
       const qrImage = await this.paymentService.generateQrImage(
         danaResult.qrContent,
       );
@@ -529,7 +536,7 @@ export class OrderService implements OnModuleInit {
       where: { id: orderId },
     });
     if (!order || order.buyerTgUserId !== buyerTgUserId) throw new BadRequestException('Order not found');
-    if (order.warrantyStatus !== 'PENDING') throw new BadRequestException('Warranty is not pending');
+    if (order.status !== 'FULFILLED') throw new BadRequestException('Order is not fulfilled');
 
     // Find or create pending report for this order
     let report = await this.prisma.loginReport.findFirst({
@@ -540,6 +547,10 @@ export class OrderService implements OnModuleInit {
     if (!report) {
       report = await this.prisma.loginReport.create({ data: { orderId } });
     }
+
+    // Limit to 3 photos per complaint session
+    const photoCount = await this.prisma.loginReportPhoto.count({ where: { reportId: report.id } });
+    if (photoCount >= 3) throw new BadRequestException('Maksimal 3 foto per sesi komplain');
 
     // Add photo to the report
     await this.prisma.loginReportPhoto.create({
@@ -793,7 +804,14 @@ export class OrderService implements OnModuleInit {
         data: { status: 'RESOLVED', resolvedNote: 'Akun diganti — minta info baru', resolvedAt: new Date() },
       });
 
-      // Reset order to WAITING_SELLER so seller can re-fulfill
+      // Save old buyerInfo as OrderMessage before nulling it
+      if (order.buyerInfo) {
+        await tx.orderMessage.create({
+          data: { orderId, message: `[INFO_PEMBELI] ${order.buyerInfo}` },
+        });
+      }
+
+      // Reset order to WAITING_SELLER so seller can re-fulfill + reset warranty
       await tx.order.update({
         where: { id: orderId },
         data: {
@@ -801,6 +819,10 @@ export class OrderService implements OnModuleInit {
           buyerInfo: null,
           fulfilledAt: null,
           accessExpiresAt: null,
+          warrantyStatus: null,
+          warrantyPhoto: null,
+          warrantyAt: null,
+          warrantyDeadline: null,
         },
       });
     });
@@ -827,11 +849,45 @@ export class OrderService implements OnModuleInit {
     if (!order || order.status !== 'WAITING_SELLER') {
       throw new BadRequestException('Order not in WAITING_SELLER status');
     }
+
+    // Validate new info is different from all previous infos
+    const previousInfoMessages = await this.prisma.orderMessage.findMany({
+      where: { orderId, message: { startsWith: '[INFO_PEMBELI]' } },
+    });
+    const previousInfos = previousInfoMessages.map(m => m.message.replace('[INFO_PEMBELI] ', '').trim().toLowerCase());
+    if (previousInfos.includes(buyerInfo.trim().toLowerCase())) {
+      throw new BadRequestException('Info yang diberikan sama dengan sebelumnya. Silakan kirim info yang berbeda.');
+    }
+
     await this.prisma.order.update({
       where: { id: orderId },
       data: { buyerInfo },
     });
+
+    // Save new buyerInfo as OrderMessage for history
+    await this.prisma.orderMessage.create({
+      data: { orderId, message: `[INFO_PEMBELI] ${buyerInfo}` },
+    });
+
     return { success: true };
+  }
+
+  async getBuyerInfoHistory(sellerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { duration: { include: { app: true } } },
+    });
+    if (!order || !order.duration || order.duration.app.sellerId !== sellerId) {
+      throw new BadRequestException('Order not found');
+    }
+    const messages = await this.prisma.orderMessage.findMany({
+      where: { orderId, message: { startsWith: '[INFO_PEMBELI]' } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return messages.map(m => ({
+      info: m.message.replace('[INFO_PEMBELI] ', ''),
+      createdAt: m.createdAt,
+    }));
   }
 
   async setupWarranty(orderId: string, sellerId: string, fulfilledAt: Date) {

@@ -259,6 +259,12 @@ export class SellerController {
     return this.orderService.fulfilOnDemand(req.seller.id, id, dto.credentials);
   }
 
+  @Get('orders/:id/buyer-info-history')
+  @UseGuards(ActiveSellerGuard)
+  async getBuyerInfoHistory(@Req() req: any, @Param('id') id: string) {
+    return this.orderService.getBuyerInfoHistory(req.seller.id, id);
+  }
+
   @Get('orders/:id/messages')
   @UseGuards(ActiveSellerGuard)
   async getOrderMessages(@Req() req: any, @Param('id') id: string) {

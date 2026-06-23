@@ -35,6 +35,7 @@ interface Duration {
   loginReportCount?: number;
   totalLoginReportCount?: number;
   needsRepairCount?: number;
+  waitingSellerCount?: number;
 }
 
 interface AppDetail {
@@ -261,7 +262,7 @@ export default function AppDetailScreen() {
             ...((item.expiredCount ?? 0) > 0 ? { borderLeftWidth: 3, borderLeftColor: '#ef4444' } : {}),
             ...((item.pendingWarrantyCount ?? 0) > 0 ? { borderRightWidth: 3, borderRightColor: '#3b82f6' } : {}),
             ...(loginReportCount > 0 ? { borderBottomWidth: 3, borderBottomColor: '#f97316' } : {}),
-            ...(needsRepairCount > 0 ? { borderTopWidth: 3, borderTopColor: '#f97316' } : {}),
+            ...(needsRepairCount > 0 ? { borderTopWidth: 3, borderTopColor: '#f97316' } : (item.waitingSellerCount ?? 0) > 0 ? { borderTopWidth: 3, borderTopColor: '#eab308' } : {}),
           };
           return (
           <TouchableOpacity
@@ -308,10 +309,13 @@ export default function AppDetailScreen() {
               <Text style={styles.warrantyBadge}>{item.pendingWarrantyCount} verifikasi</Text>
             )}
             {loginReportCount > 0 && (
-              <Text style={styles.loginReportBadge}>{loginReportCount} laporan login</Text>
+              <Text style={styles.loginReportBadge}>{loginReportCount} komplain</Text>
             )}
             {needsRepairCount > 0 && (
               <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{1F527}'} {needsRepairCount} perlu diperbaiki</Text>
+            )}
+            {(item.waitingSellerCount ?? 0) > 0 && (
+              <Text style={{ color: '#eab308', fontSize: 12, fontWeight: '600', marginTop: 4 }}>{'\u{23F0}'} {item.waitingSellerCount} menunggu proses</Text>
             )}
           </TouchableOpacity>
           );
